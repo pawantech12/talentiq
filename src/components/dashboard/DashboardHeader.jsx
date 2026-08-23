@@ -45,7 +45,7 @@ export default function DashboardHeader({
               width={0}
               height={0}
               sizes="100vw"
-              className="w-36"
+              className="w-32"
             />
           </Link>
         </div>
@@ -99,7 +99,7 @@ export default function DashboardHeader({
               width={0}
               height={0}
               sizes="100vw"
-              className="w-36"
+              className="w-32"
             />
           </Link>
         </div>
