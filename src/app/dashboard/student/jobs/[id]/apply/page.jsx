@@ -15,6 +15,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 
 export default function ApplyPage() {
   const fileInputRef = useRef(null);
@@ -24,6 +25,12 @@ export default function ApplyPage() {
   const [uploadError, setUploadError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const params = useParams();
+
+  const id = params.id;
+
+  const router = useRouter();
 
   const job = {
     initials: "AT",
@@ -157,23 +164,18 @@ export default function ApplyPage() {
       return;
     }
 
-    setUploadError("");
     setIsSubmitting(true);
 
-    try {
-      // Simulate frontend submission.
-      // Replace this section later with your API request.
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      setSubmitted(true);
-    } finally {
-      setIsSubmitting(false);
-    }
+    setIsSubmitting(false);
+
+    router.push(`/dashboard/student/jobs/${id}/analysis`);
   };
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#111827]">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-5 sm:px-6 sm:py-7 lg:px-7 lg:py-8">
+      <div className="mx-auto w-full  px-4 py-5 sm:px-6 sm:py-7 lg:px-7 lg:py-8">
         {/* PAGE HEADING */}
         <div className="mb-4 sm:mb-5 lg:mb-6">
           <h1 className="text-[21px] font-bold leading-7 tracking-[-0.025em] text-[#111827] sm:text-[25px] lg:text-[26px]">

@@ -136,7 +136,7 @@ export default function JobDetailsPage() {
 
                 {/* Apply */}
                 <Link
-                  href={`/student/jobs/${id}/apply`}
+                  href={`/dashboard/student/jobs/${id}/apply`}
                   className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-[8px] bg-[#4F46E5] px-5 text-[13px] font-semibold text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:bg-[#4338CA] sm:flex-none sm:px-6"
                 >
                   Apply Now
@@ -609,7 +609,7 @@ export default function JobDetailsPage() {
             </p>
 
             <Link
-              href={`/student/jobs/${id}/apply`}
+              href={`/dashboard/student/jobs/${id}/apply`}
               className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-[8px] bg-[#4F46E5] text-[13px] font-semibold text-white shadow-[0_4px_10px_rgba(79,70,229,0.16)] transition hover:bg-[#4338CA]"
             >
               Apply Now
@@ -638,7 +638,7 @@ export default function JobDetailsPage() {
       ====================================================== */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#E2E8F0] bg-white/95 px-5 py-3 backdrop-blur lg:hidden">
         <Link
-          href={`/student/jobs/${id}/apply`}
+          href={`/dashboard/student/jobs/${id}/apply`}
           className="flex h-[42px] w-full items-center justify-center gap-2 rounded-[8px] bg-[#4F46E5] text-[15px] font-semibold text-white shadow-[0_4px_12px_rgba(79,70,229,0.2)] transition hover:bg-[#4338CA]"
         >
           Apply Now

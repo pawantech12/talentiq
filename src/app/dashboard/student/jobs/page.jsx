@@ -21,6 +21,7 @@ import {
   Check,
   BriefcaseBusiness,
 } from "lucide-react";
+import Link from "next/link";
 
 export default function FindJobsPage() {
   /*
@@ -1009,11 +1010,8 @@ export default function FindJobsPage() {
 
                   {/* Bottom */}
                   <div className="mt-4 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log(`Opening job: ${job.title}`);
-                      }}
+                    <Link
+                      href={`/dashboard/student/jobs/${job.id}`}
                       className={`inline-flex h-9 items-center justify-center gap-2 rounded-[7px] px-7 text-[13px] font-semibold transition active:scale-[0.98] ${
                         job.match >= 82
                           ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
@@ -1022,7 +1020,7 @@ export default function FindJobsPage() {
                     >
                       View Job
                       <ChevronRight size={16} />
-                    </button>
+                    </Link>
 
                     {job.status === "New" ? (
                       <span className="inline-flex items-center rounded-full bg-[#DCFCE7] px-3 py-1 text-[12px] font-semibold text-[#16A34A]">
