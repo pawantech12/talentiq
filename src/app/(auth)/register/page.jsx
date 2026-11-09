@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+import { useFieldArray, useForm } from "react-hook-form";
 
 import {
   ArrowRight,
@@ -36,20 +39,37 @@ export default function RegistrationPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    education: "",
-    skills: ["React", "JavaScript", "Node.js"],
-    companyName: "",
-    recruiterName: "",
+  const router = useRouter();
+  const {
+    control,
+    watch,
+    setValue,
+    getValues,
+    handleSubmit: rhfHandleSubmit,
+  } = useForm({
+    mode: "onTouched",
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      education: "",
+      skills: [],
+      companyName: "",
+      recruiterName: "",
+      agree: false,
+    },
   });
-
+  const {
+    fields: skillFields,
+    append: appendSkill,
+    remove: removeSkillAt,
+  } = useFieldArray({ control, name: "skills" });
+  const form = watch();
+  const agree = Boolean(form.agree);
   const [skillInput, setSkillInput] = useState("");
-
-  const [agree, setAgree] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState("");
 
   const [errors, setErrors] = useState({
     fullName: "",
@@ -64,15 +84,9 @@ export default function RegistrationPage() {
   });
 
   const updateField = (field, value) => {
-    setForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-
-    setErrors((previous) => ({
-      ...previous,
-      [field]: "",
-    }));
+    setValue(field, value, { shouldDirty: true, shouldValidate: true });
+    setErrors((previous) => ({ ...previous, [field]: "" }));
+    setServerError("");
   };
 
   const passwordRules = useMemo(() => {
@@ -100,8 +114,9 @@ export default function RegistrationPage() {
       return;
     }
 
-    const alreadyExists = form.skills.some(
-      (item) => item.toLowerCase() === skill.toLowerCase(),
+    const currentSkills = getValues("skills") || [];
+    const alreadyExists = currentSkills.some(
+      (item) => item.value.toLowerCase() === skill.toLowerCase(),
     );
 
     if (alreadyExists) {
@@ -112,10 +127,7 @@ export default function RegistrationPage() {
       return;
     }
 
-    setForm((previous) => ({
-      ...previous,
-      skills: [...previous.skills, skill],
-    }));
+    appendSkill({ value: skill });
 
     setSkillInput("");
 
@@ -132,11 +144,8 @@ export default function RegistrationPage() {
     }
   };
 
-  const removeSkill = (skill) => {
-    setForm((previous) => ({
-      ...previous,
-      skills: previous.skills.filter((item) => item !== skill),
-    }));
+  const removeSkill = (index) => {
+    removeSkillAt(index);
 
     setErrors((previous) => ({
       ...previous,
@@ -286,9 +295,7 @@ export default function RegistrationPage() {
     ================================================================
   */
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
-
+  const submitRegistration = async () => {
     const isValid = validateForm();
 
     if (!isValid) {
@@ -297,35 +304,40 @@ export default function RegistrationPage() {
 
     const payload = {
       role,
-      ...form,
       fullName: form.fullName.trim(),
       email: form.email.trim().toLowerCase(),
-      companyName: form.companyName.trim(),
-      recruiterName: form.recruiterName.trim(),
-      agree,
+      password: form.password,
+      education: role === "student" ? form.education : undefined,
+      skills:
+        role === "student"
+          ? (form.skills || []).map((item) => item.value.trim())
+          : [],
+      companyName: role === "recruiter" ? form.companyName.trim() : undefined,
+      recruiterName:
+        role === "recruiter" ? form.recruiterName.trim() : undefined,
+      agree: Boolean(form.agree),
     };
 
-    console.log("Registration data:", payload);
-
-    /*
-      --------------------------------------------------------------
-      REPLACE WITH YOUR REGISTRATION API
-      --------------------------------------------------------------
-
-      Example:
-
-      const response = await registerUser(payload);
-
-      if (!response.success) {
-        setErrors({
-          ...,
-          email: "An account with this email already exists.",
-        });
-        return;
+    setIsSubmitting(true);
+    setServerError("");
+    try {
+      await axios.post("/api/auth/register", payload, {
+        headers: { "Content-Type": "application/json" },
+        withCredentials: true,
+      });
+      window.sessionStorage.setItem("resumeai_pending_email", payload.email);
+      router.push(`/verify-email?email=${encodeURIComponent(payload.email)}`);
+    } catch (error) {
+      const message =
+        error?.response?.data?.message ||
+        "We couldn't start your registration. Please try again.";
+      setServerError(message);
+      if (error?.response?.data?.field === "email") {
+        setErrors((previous) => ({ ...previous, email: message }));
       }
-
-      router.push("/login");
-    */
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /*
@@ -336,6 +348,7 @@ export default function RegistrationPage() {
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
+    setServerError("");
 
     setErrors({
       fullName: "",
@@ -419,7 +432,11 @@ export default function RegistrationPage() {
                   FORM
                   ========================================================== */}
 
-              <form onSubmit={handleSubmit} className="mt-7" noValidate>
+              <form
+                onSubmit={rhfHandleSubmit(submitRegistration)}
+                className="mt-7"
+                noValidate
+              >
                 {/* ========================================================
                     ROLE SELECTOR
                     ======================================================== */}
@@ -952,17 +969,17 @@ export default function RegistrationPage() {
                         } focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          {form.skills.map((skill) => (
+                          {skillFields.map((skill, index) => (
                             <span
-                              key={skill}
+                              key={skill.id}
                               className="inline-flex h-[25px] items-center gap-1 rounded-full bg-indigo-50 px-2.5 text-[11px] font-medium text-indigo-600"
                             >
-                              {skill}
+                              {skill.value}
 
                               <button
                                 type="button"
-                                onClick={() => removeSkill(skill)}
-                                aria-label={`Remove ${skill}`}
+                                onClick={() => removeSkill(index)}
+                                aria-label={`Remove ${skill.value}`}
                                 className="text-indigo-400 transition hover:text-indigo-700"
                               >
                                 <X size={11} strokeWidth={2} />
@@ -1166,7 +1183,7 @@ export default function RegistrationPage() {
                       type="checkbox"
                       checked={agree}
                       onChange={(event) => {
-                        setAgree(event.target.checked);
+                        updateField("agree", event.target.checked);
 
                         setErrors((previous) => ({
                           ...previous,
@@ -1205,11 +1222,21 @@ export default function RegistrationPage() {
                     CREATE ACCOUNT
                     ======================================================== */}
 
+                {serverError && (
+                  <p
+                    role="alert"
+                    className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-600"
+                  >
+                    {serverError}
+                  </p>
+                )}
+
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] bg-indigo-600 text-[15px] font-semibold text-white shadow-[0_8px_20px_rgba(79,70,229,0.18)] transition hover:bg-indigo-700 active:scale-[0.99]"
                 >
-                  Create Account
+                  {isSubmitting ? "Creating Account..." : "Create Account"}
                   <ArrowRight size={19} strokeWidth={2.2} />
                 </button>
 

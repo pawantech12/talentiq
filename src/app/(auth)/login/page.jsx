@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 import {
   ArrowRight,
@@ -13,135 +16,94 @@ import {
   Sparkles,
   CircleAlert,
 } from "lucide-react";
+
 import Link from "next/link";
 import Image from "next/image";
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [role, setRole] = useState("student");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [serverError, setServerError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
+  const {
+    register,
+    handleSubmit,
+    clearErrors,
+    setError,
+    formState: { errors },
+  } = useForm({
+    mode: "onBlur",
+    defaultValues: {
+      email: "",
+      password: "",
+    },
   });
-
-  // Field-specific errors
-  const [errors, setErrors] = useState({
-    email: "",
-    password: "",
-  });
-
-  const updateField = (field, value) => {
-    setForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-
-    // Clear only the error for the field being edited
-    if (errors[field]) {
-      setErrors((previous) => ({
-        ...previous,
-        [field]: "",
-      }));
-    }
-  };
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
-
-    // Clear validation errors when changing role
-    setErrors({
-      email: "",
-      password: "",
-    });
+    setServerError("");
+    clearErrors();
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const onSubmit = async (formData) => {
+    setServerError("");
+    setIsSubmitting(true);
 
-    const email = form.email.trim();
-    const password = form.password.trim();
+    try {
+      const response = await axios.post(
+        "/api/auth/login",
+        {
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password,
+          role,
+          rememberMe,
+        },
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
 
-    const newErrors = {
-      email: "",
-      password: "",
-    };
+      if (response.data?.success) {
+        const loggedInRole = response.data.user?.role;
 
-    /*
-      ------------------------------------------------------------
-      EMAIL VALIDATION
-      ------------------------------------------------------------
-    */
-
-    if (!email) {
-      newErrors.email = "Please enter your email address.";
-    } else {
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-      if (!emailPattern.test(email)) {
-        newErrors.email = "Please enter a valid email address.";
+        if (loggedInRole === "student") {
+          router.replace("/dashboard/student");
+        } else if (loggedInRole === "recruiter") {
+          router.replace("/dashboard/recruiter");
+        } else {
+          setServerError("Unable to identify your account type.");
+        }
       }
-    }
+    } catch (error) {
+      const response = error.response;
+      const message =
+        response?.data?.message || "Unable to log in. Please try again.";
 
-    /*
-      ------------------------------------------------------------
-      PASSWORD VALIDATION
-      ------------------------------------------------------------
-    */
-
-    if (!password) {
-      newErrors.password = "Please enter your password.";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters.";
-    }
-
-    /*
-      ------------------------------------------------------------
-      SET VALIDATION ERRORS
-      ------------------------------------------------------------
-    */
-
-    setErrors(newErrors);
-
-    // Stop submission if there are validation errors
-    if (newErrors.email || newErrors.password) {
-      return;
-    }
-
-    /*
-      ------------------------------------------------------------
-      AUTHENTICATION / API
-      ------------------------------------------------------------
-
-      Replace this section with your actual login API.
-
-      Example:
-
-      const response = await loginUser({
-        role,
-        email,
-        password,
-        rememberMe,
-      });
-
-      if (!response.success) {
-        setErrors({
-          email: "",
-          password: "Invalid email or password. Please try again.",
+      if (response?.data?.field === "role") {
+        setServerError(message);
+      } else if (response?.data?.code === "EMAIL_NOT_VERIFIED") {
+        setError("email", {
+          type: "server",
+          message,
         });
-        return;
+      } else if (response?.status === 401) {
+        setError("password", {
+          type: "server",
+          message,
+        });
+      } else {
+        setServerError(message);
       }
-
-      // Redirect to student/recruiter dashboard
-    */
-
-    console.log({
-      role,
-      email,
-      password,
-      rememberMe,
-    });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const emailHasError = Boolean(errors.email);
@@ -150,13 +112,9 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen bg-slate-50 lg:bg-white">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[45%_55%]">
-        {/* ================================================================
-            LEFT DESKTOP HERO
-            ================================================================ */}
+        {/* LEFT DESKTOP HERO */}
 
         <section className="relative hidden min-h-screen overflow-hidden bg-gradient-to-br from-[#37319A] via-[#4840D7] to-[#4E45F4] lg:block">
-          {/* Decorative circles */}
-
           <div className="absolute -left-[80px] -top-[85px] h-[260px] w-[260px] rounded-full bg-white/[0.06]" />
 
           <div className="absolute -bottom-[100px] right-[-50px] h-[270px] w-[270px] rounded-full bg-white/[0.035]" />
@@ -193,8 +151,6 @@ export default function LoginPage() {
             {/* CANDIDATE AI CARD */}
 
             <div className="mt-9 rounded-[17px] bg-white p-5 shadow-[0_20px_45px_rgba(22,18,100,0.25)]">
-              {/* Candidate header */}
-
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-[13px] font-bold text-purple-600">
@@ -217,8 +173,6 @@ export default function LoginPage() {
                 </span>
               </div>
 
-              {/* AI completed strip */}
-
               <div className="mt-4 flex items-center justify-between rounded-[8px] bg-purple-50 px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <Sparkles
@@ -234,8 +188,6 @@ export default function LoginPage() {
 
                 <span className="h-2 w-2 rounded-full bg-purple-500" />
               </div>
-
-              {/* Skills */}
 
               <div className="mt-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -263,8 +215,6 @@ export default function LoginPage() {
                   </span>
                 </div>
               </div>
-
-              {/* Match score */}
 
               <div className="mt-4 flex items-center gap-3">
                 <span className="shrink-0 text-[11px] text-slate-500">
@@ -315,12 +265,10 @@ export default function LoginPage() {
           </div>
         </section>
 
-        {/* ================================================================
-            RIGHT LOGIN SECTION
-            ================================================================ */}
+        {/* RIGHT LOGIN SECTION */}
 
-        <section className="flex items-start justify-center bg-slate-50  sm:px-8 lg:bg-white px-20 py-[60px] max-sm:px-5 max-sm:py-10">
-          <div className="w-full max-w-[420px] ">
+        <section className="flex items-start justify-center bg-slate-50 sm:px-8 lg:bg-white px-20 py-[60px] max-sm:px-5 max-sm:py-10">
+          <div className="w-full max-w-[420px]">
             {/* MOBILE LOGO */}
 
             <div className="mb-6 flex items-center gap-3 lg:hidden">
@@ -376,10 +324,8 @@ export default function LoginPage() {
 
             {/* FORM */}
 
-            <form onSubmit={handleSubmit} className="mt-6">
-              {/* ============================================================
-                  EMAIL
-                  ============================================================ */}
+            <form onSubmit={handleSubmit(onSubmit)} className="mt-6" noValidate>
+              {/* EMAIL */}
 
               <div>
                 <label
@@ -401,13 +347,21 @@ export default function LoginPage() {
                   <input
                     id="email"
                     type="email"
-                    value={form.email}
-                    onChange={(event) =>
-                      updateField("email", event.target.value)
-                    }
+                    autoComplete="email"
                     placeholder="Enter your email address"
                     aria-invalid={emailHasError}
                     aria-describedby={emailHasError ? "email-error" : undefined}
+                    {...register("email", {
+                      required: "Please enter your email address.",
+                      pattern: {
+                        value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                        message: "Please enter a valid email address.",
+                      },
+                      maxLength: {
+                        value: 254,
+                        message: "Email address is too long.",
+                      },
+                    })}
                     className={`h-[50px] w-full rounded-[8px] border pl-11 pr-4 text-[14px] outline-none transition ${
                       emailHasError
                         ? "border-red-400 bg-red-50 text-slate-800 placeholder:text-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
@@ -415,8 +369,6 @@ export default function LoginPage() {
                     }`}
                   />
                 </div>
-
-                {/* EMAIL ERROR */}
 
                 {emailHasError && (
                   <div
@@ -429,14 +381,12 @@ export default function LoginPage() {
                       className="shrink-0"
                     />
 
-                    <span>{errors.email}</span>
+                    <span>{errors.email.message}</span>
                   </div>
                 )}
               </div>
 
-              {/* ============================================================
-                  PASSWORD
-                  ============================================================ */}
+              {/* PASSWORD */}
 
               <div className="mt-4">
                 <label
@@ -458,15 +408,23 @@ export default function LoginPage() {
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    value={form.password}
-                    onChange={(event) =>
-                      updateField("password", event.target.value)
-                    }
+                    autoComplete="current-password"
                     placeholder="Enter your password"
                     aria-invalid={passwordHasError}
                     aria-describedby={
                       passwordHasError ? "password-error" : undefined
                     }
+                    {...register("password", {
+                      required: "Please enter your password.",
+                      minLength: {
+                        value: 8,
+                        message: "Password must be at least 8 characters.",
+                      },
+                      maxLength: {
+                        value: 72,
+                        message: "Password cannot exceed 72 characters.",
+                      },
+                    })}
                     className={`h-[50px] w-full rounded-[8px] border pl-11 pr-12 text-[14px] outline-none transition ${
                       passwordHasError
                         ? "border-red-400 bg-red-50 text-slate-800 placeholder:text-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
@@ -490,8 +448,6 @@ export default function LoginPage() {
                   </button>
                 </div>
 
-                {/* PASSWORD ERROR */}
-
                 {passwordHasError && (
                   <div
                     id="password-error"
@@ -503,14 +459,25 @@ export default function LoginPage() {
                       className="shrink-0"
                     />
 
-                    <span>{errors.password}</span>
+                    <span>{errors.password.message}</span>
                   </div>
                 )}
               </div>
 
-              {/* ============================================================
-                  REMEMBER / FORGOT
-                  ============================================================ */}
+              {/* SERVER ERROR */}
+
+              {serverError && (
+                <div
+                  role="alert"
+                  className="mt-4 flex items-start gap-2 rounded-[6px] bg-red-100 px-3 py-2.5 text-[12px] leading-5 text-red-600"
+                >
+                  <CircleAlert size={15} className="mt-0.5 shrink-0" />
+
+                  <span>{serverError}</span>
+                </div>
+              )}
+
+              {/* REMEMBER / FORGOT */}
 
               <div className="mt-4 flex items-center justify-between">
                 <label className="flex cursor-pointer items-center gap-2">
@@ -536,29 +503,35 @@ export default function LoginPage() {
                   </span>
                 </label>
 
-                <button
-                  type="button"
+                <Link
+                  href="/forgot-password"
                   className="text-[13px] font-medium text-indigo-600 hover:text-indigo-700"
                 >
                   Forgot password?
-                </button>
+                </Link>
               </div>
 
-              {/* ============================================================
-                  SIGN IN
-                  ============================================================ */}
+              {/* SIGN IN */}
 
               <button
                 type="submit"
-                className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-[9px] bg-indigo-600 text-[14px] font-semibold text-white shadow-[0_8px_20px_rgba(79,70,229,0.20)] transition hover:bg-indigo-700 active:scale-[0.99]"
+                disabled={isSubmitting}
+                className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-[9px] bg-indigo-600 text-[14px] font-semibold text-white shadow-[0_8px_20px_rgba(79,70,229,0.20)] transition hover:bg-indigo-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Sign In
-                <ArrowRight size={18} strokeWidth={2.2} />
+                {isSubmitting ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Signing In...
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight size={18} strokeWidth={2.2} />
+                  </>
+                )}
               </button>
 
-              {/* ============================================================
-                  DIVIDER
-                  ============================================================ */}
+              {/* DIVIDER */}
 
               <div className="my-6 flex items-center gap-3">
                 <div className="h-px flex-1 bg-slate-200" />
@@ -570,13 +543,13 @@ export default function LoginPage() {
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
 
-              {/* ============================================================
-                  GOOGLE
-                  ============================================================ */}
+              {/* GOOGLE */}
 
               <button
                 type="button"
-                className="flex h-[50px] w-full items-center justify-center gap-3 rounded-[8px] border border-slate-200 bg-white text-[14px] font-medium text-slate-600 transition hover:bg-slate-50"
+                disabled
+                title="Google sign-in is not configured yet."
+                className="flex h-[50px] w-full cursor-not-allowed items-center justify-center gap-3 rounded-[8px] border border-slate-200 bg-white text-[14px] font-medium text-slate-400 opacity-70"
               >
                 <span className="text-[19px] font-bold leading-none">
                   <span className="text-[#4285F4]">G</span>
@@ -585,9 +558,7 @@ export default function LoginPage() {
                 <span>Continue with Google</span>
               </button>
 
-              {/* ============================================================
-                  CREATE ACCOUNT
-                  ============================================================ */}
+              {/* CREATE ACCOUNT */}
 
               <p className="mt-6 text-center text-[13px] text-slate-500">
                 Don't have an account?{" "}
@@ -599,9 +570,7 @@ export default function LoginPage() {
                 </Link>
               </p>
 
-              {/* ============================================================
-                  SECURITY
-                  ============================================================ */}
+              {/* SECURITY */}
 
               <div className="mt-6 flex items-center justify-center gap-2 text-[12px] text-slate-500">
                 <ShieldCheck size={14} strokeWidth={1.7} />

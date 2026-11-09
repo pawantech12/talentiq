@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   MapPin,
@@ -22,158 +22,28 @@ import {
   BriefcaseBusiness,
 } from "lucide-react";
 import Link from "next/link";
+import api from "@/lib/api";
+
+function formatPostedDate(date) {
+  if (!date) return "Recently posted";
+
+  const days = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(date).getTime()) / 86400000),
+  );
+
+  if (days === 0) return "Posted today";
+  if (days === 1) return "Posted 1 day ago";
+
+  return `Posted ${days} days ago`;
+}
 
 export default function FindJobsPage() {
-  /*
-   * ============================================================
-   * JOB DATA
-   * ============================================================
-   */
+  const [jobs, setJobs] = useState([]);
+  const [bookmarkedJobs, setBookmarkedJobs] = useState([]);
 
-  const jobs = [
-    {
-      id: 1,
-      initials: "AT",
-      title: "Full Stack Developer",
-      company: "ABC Technologies",
-      location: "Mumbai",
-      type: "Full-time",
-      experience: "0–2 Years",
-      posted: "2 days ago",
-      postedDays: 2,
-      match: 91,
-      matchText: "Strong match for your profile",
-      skills: ["React", "Node.js", "MongoDB", "Express.js"],
-      accent: "blue",
-      education: "Any Education",
-      status: "New",
-    },
-    {
-      id: 2,
-      initials: "TN",
-      title: "Frontend Developer",
-      company: "TechNova Solutions",
-      location: "Thane",
-      type: "Full-time",
-      experience: "0–2 Years",
-      posted: "3 days ago",
-      postedDays: 3,
-      match: 86,
-      matchText: "Good match for your profile",
-      skills: ["React", "JavaScript", "Tailwind CSS"],
-      accent: "purple",
-      education: "Any Education",
-      status: "Posted 3 days ago",
-    },
-    {
-      id: 3,
-      initials: "CS",
-      title: "Node.js Developer",
-      company: "CodeSphere",
-      location: "Mumbai",
-      type: "Full-time",
-      experience: "1–2 Years",
-      posted: "5 days ago",
-      postedDays: 5,
-      match: 82,
-      matchText: "Good match for your profile",
-      skills: ["Node.js", "Express.js", "MongoDB"],
-      accent: "green",
-      education: "Any Education",
-      status: "Posted 5 days ago",
-    },
-    {
-      id: 4,
-      initials: "DW",
-      title: "React Developer",
-      company: "DigitalWorks",
-      location: "Remote",
-      type: "Full-time",
-      experience: "0–2 Years",
-      posted: "1 week ago",
-      postedDays: 7,
-      match: 78,
-      matchText: "Potential match for your profile",
-      skills: ["React", "JavaScript", "Next.js"],
-      accent: "yellow",
-      education: "Any Education",
-      status: "Remote",
-    },
-    {
-      id: 5,
-      initials: "NX",
-      title: "Next.js Developer",
-      company: "Nexora Labs",
-      location: "Mumbai",
-      type: "Full-time",
-      experience: "1–3 Years",
-      posted: "8 days ago",
-      postedDays: 8,
-      match: 88,
-      matchText: "Good match for your profile",
-      skills: ["Next.js", "React", "TypeScript"],
-      accent: "purple",
-      education: "Bachelor's",
-      status: "Posted 8 days ago",
-    },
-    {
-      id: 6,
-      initials: "BE",
-      title: "Backend Developer",
-      company: "ByteEdge",
-      location: "Pune",
-      type: "Full-time",
-      experience: "2–4 Years",
-      posted: "10 days ago",
-      postedDays: 10,
-      match: 81,
-      matchText: "Good match for your profile",
-      skills: ["Node.js", "Express.js", "PostgreSQL"],
-      accent: "green",
-      education: "Bachelor's",
-      status: "Posted 10 days ago",
-    },
-    {
-      id: 7,
-      initials: "UI",
-      title: "UI Developer",
-      company: "PixelCraft",
-      location: "Remote",
-      type: "Contract",
-      experience: "0–2 Years",
-      posted: "12 days ago",
-      postedDays: 12,
-      match: 79,
-      matchText: "Potential match for your profile",
-      skills: ["React", "CSS", "JavaScript"],
-      accent: "blue",
-      education: "Any Education",
-      status: "Remote",
-    },
-    {
-      id: 8,
-      initials: "FS",
-      title: "Software Engineer",
-      company: "FutureStack",
-      location: "Bangalore",
-      type: "Full-time",
-      experience: "2–4 Years",
-      posted: "14 days ago",
-      postedDays: 14,
-      match: 84,
-      matchText: "Good match for your profile",
-      skills: ["JavaScript", "React", "Node.js"],
-      accent: "purple",
-      education: "Bachelor's",
-      status: "Posted 14 days ago",
-    },
-  ];
-
-  /*
-   * ============================================================
-   * STATE
-   * ============================================================
-   */
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -185,18 +55,53 @@ export default function FindJobsPage() {
   const [education, setEducation] = useState("All Education");
 
   const [sortBy, setSortBy] = useState("Best Match");
-
   const [activePage, setActivePage] = useState(1);
 
-  const [bookmarkedJobs, setBookmarkedJobs] = useState([]);
-
   const [showInsight, setShowInsight] = useState(true);
-
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
   const [openDropdown, setOpenDropdown] = useState(null);
 
   const jobsPerPage = 4;
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadJobs() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [jobsResponse, savedResponse] = await Promise.all([
+          api.get("/student/jobs"),
+          api.get("/student/saved-jobs"),
+        ]);
+
+        if (!active) return;
+
+        setJobs(jobsResponse.data.jobs || []);
+        setBookmarkedJobs(savedResponse.data.savedJobIds || []);
+      } catch (err) {
+        if (!active) return;
+
+        if (err.response?.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+
+        setError(
+          err.response?.data?.message || "Unable to load available jobs.",
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadJobs();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /*
    * ============================================================
@@ -275,30 +180,34 @@ export default function FindJobsPage() {
    */
 
   const filteredJobs = useMemo(() => {
-    const normalizedSearch = appliedSearch.trim().toLowerCase();
+    const query = appliedSearch.trim().toLowerCase();
 
     let result = jobs.filter((job) => {
+      const skills = [
+        ...(job.requiredSkills || []),
+        ...(job.preferredSkills || []),
+      ];
+
       const matchesSearch =
-        !normalizedSearch ||
-        job.title.toLowerCase().includes(normalizedSearch) ||
-        job.company.toLowerCase().includes(normalizedSearch) ||
-        job.location.toLowerCase().includes(normalizedSearch) ||
-        job.skills.some((item) =>
-          item.toLowerCase().includes(normalizedSearch),
-        );
+        !query ||
+        job.title?.toLowerCase().includes(query) ||
+        job.company?.toLowerCase().includes(query) ||
+        job.location?.toLowerCase().includes(query) ||
+        skills.some((item) => item.toLowerCase().includes(query));
 
       const matchesLocation =
         location === "All Locations" || job.location === location;
 
       const matchesExperience =
-        experience === "Any Experience" || job.experience === experience;
+        experience === "Any Experience" || job.experienceLevel === experience;
 
-      const matchesType = jobType === "All Types" || job.type === jobType;
+      const matchesType =
+        jobType === "All Types" || job.employmentType === jobType;
 
-      const matchesSkill = skill === "All Skills" || job.skills.includes(skill);
+      const matchesSkill = skill === "All Skills" || skills.includes(skill);
 
       const matchesEducation =
-        education === "All Education" || job.education === education;
+        education === "All Education" || job.educationRequirement === education;
 
       return (
         matchesSearch &&
@@ -310,12 +219,12 @@ export default function FindJobsPage() {
       );
     });
 
-    if (sortBy === "Best Match") {
-      result.sort((a, b) => b.match - a.match);
-    }
-
     if (sortBy === "Most Recent") {
-      result.sort((a, b) => a.postedDays - b.postedDays);
+      result.sort(
+        (a, b) =>
+          new Date(b.publishedAt || b.createdAt) -
+          new Date(a.publishedAt || a.createdAt),
+      );
     }
 
     if (sortBy === "A–Z") {
@@ -323,8 +232,16 @@ export default function FindJobsPage() {
     }
 
     return result;
-  }, [appliedSearch, location, experience, jobType, skill, education, sortBy]);
-
+  }, [
+    jobs,
+    appliedSearch,
+    location,
+    experience,
+    jobType,
+    skill,
+    education,
+    sortBy,
+  ]);
   /*
    * ============================================================
    * PAGINATION
@@ -374,14 +291,28 @@ export default function FindJobsPage() {
     setActivePage(1);
   };
 
-  const toggleBookmark = (id) => {
-    setBookmarkedJobs((current) =>
-      current.includes(id)
-        ? current.filter((jobId) => jobId !== id)
-        : [...current, id],
-    );
-  };
+  const toggleBookmark = async (jobId) => {
+    const isSaved = bookmarkedJobs.includes(jobId);
 
+    try {
+      if (isSaved) {
+        await api.delete(`/student/saved-jobs/${jobId}`);
+
+        setBookmarkedJobs((current) => current.filter((id) => id !== jobId));
+      } else {
+        await api.post("/student/saved-jobs", { jobId });
+
+        setBookmarkedJobs((current) => [...current, jobId]);
+      }
+    } catch (err) {
+      if (err.response?.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      alert(err.response?.data?.message || "Unable to update saved jobs.");
+    }
+  };
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages) return;
 
@@ -392,6 +323,8 @@ export default function FindJobsPage() {
       behavior: "smooth",
     });
   };
+
+  console.log("Jobs: ", visibleJobs);
 
   /*
    * ============================================================
@@ -862,6 +795,28 @@ export default function FindJobsPage() {
             SAME CARD MARKUP FOR MOBILE + DESKTOP
         ======================================================= */}
 
+        {loading && (
+          <div className="rounded-xl border border-[#DCE3EE] bg-white p-10 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#E0E7FF] border-t-[#4F46E5]" />
+            <p className="mt-3 text-sm text-[#64748B]">
+              Loading available jobs...
+            </p>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-center">
+            <p className="text-sm text-red-700">{error}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-3 rounded-lg bg-[#4F46E5] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
         {visibleJobs.length > 0 ? (
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             {visibleJobs.map((job) => {
@@ -887,11 +842,11 @@ export default function FindJobsPage() {
                 yellow: "bg-[#FEF3C7] text-[#D97706]",
               };
 
-              const isBookmarked = bookmarkedJobs.includes(job.id);
+              const isBookmarked = bookmarkedJobs.includes(job._id);
 
               return (
                 <article
-                  key={job.id}
+                  key={job._id}
                   className="rounded-[14px] border border-[#DCE3EE] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition hover:border-[#C7D2FE] hover:shadow-[0_4px_15px_rgba(15,23,42,0.04)] sm:p-5"
                 >
                   {/* Job top */}
@@ -900,7 +855,12 @@ export default function FindJobsPage() {
                       <div
                         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[9px] text-[14px] font-bold ${initialsStyle[job.accent]}`}
                       >
-                        {job.initials}
+                        {job.title
+                          ?.trim()
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((part) => part[0]?.toUpperCase())
+                          .join("") || "R"}
                       </div>
 
                       <div className="min-w-0">
@@ -909,14 +869,14 @@ export default function FindJobsPage() {
                         </h3>
 
                         <p className="mt-0.5 text-[13px] text-[#64748B]">
-                          {job.company}
+                          {job.recruiter.profile.recruiter.companyName}
                         </p>
                       </div>
                     </div>
 
                     <button
                       type="button"
-                      onClick={() => toggleBookmark(job.id)}
+                      onClick={() => toggleBookmark(job._id)}
                       aria-label={
                         isBookmarked
                           ? `Remove ${job.title} bookmark`
@@ -936,38 +896,6 @@ export default function FindJobsPage() {
                     </button>
                   </div>
 
-                  {/* Match */}
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-[12px] font-semibold leading-none ${matchBadge}`}
-                    >
-                      <Sparkles size={12} className="mr-1" />
-                      {job.match}% Match
-                    </span>
-
-                    <span className="text-right text-[12px] text-[#71829B]">
-                      <span className="sm:hidden">
-                        {isGreen
-                          ? "Strong match"
-                          : isYellow
-                            ? "Potential match"
-                            : "Good match"}
-                      </span>
-
-                      <span className="hidden sm:inline">{job.matchText}</span>
-                    </span>
-                  </div>
-
-                  {/* Progress */}
-                  <div className="mt-4 h-[5px] overflow-hidden rounded-full bg-[#EEF2F7]">
-                    <div
-                      className={`h-full rounded-full ${progressColor}`}
-                      style={{
-                        width: `${job.match}%`,
-                      }}
-                    />
-                  </div>
-
                   {/* Meta */}
                   <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-[#71829B]">
                     <span className="inline-flex items-center gap-1.5">
@@ -977,23 +905,23 @@ export default function FindJobsPage() {
 
                     <span className="inline-flex items-center gap-1.5">
                       <Clock3 size={13} />
-                      {job.type}
+                      {job.employmentType}
                     </span>
 
                     <span className="inline-flex items-center gap-1.5">
                       <BarChart3 size={13} />
-                      {job.experience}
+                      {job.experienceLevel}
                     </span>
 
                     <span className="hidden items-center gap-1.5 sm:inline-flex">
                       <CalendarDays size={13} />
-                      {job.posted}
+                      {formatPostedDate(job.publishedAt)}
                     </span>
                   </div>
 
                   {/* Skills */}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {job.skills.slice(0, 4).map((jobSkill) => (
+                    {job.requiredSkills.slice(0, 4).map((jobSkill) => (
                       <button
                         key={jobSkill}
                         type="button"
@@ -1011,7 +939,7 @@ export default function FindJobsPage() {
                   {/* Bottom */}
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <Link
-                      href={`/dashboard/student/jobs/${job.id}`}
+                      href={`/dashboard/student/jobs/${job._id}`}
                       className={`inline-flex h-9 items-center justify-center gap-2 rounded-[7px] px-7 text-[13px] font-semibold transition active:scale-[0.98] ${
                         job.match >= 82
                           ? "bg-[#4F46E5] text-white hover:bg-[#4338CA]"

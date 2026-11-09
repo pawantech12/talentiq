@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import api from "@/lib/api";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 
 /* ---------------------------------------------------------
@@ -24,7 +26,7 @@ import { Controller, useFieldArray, useForm } from "react-hook-form";
 
 const EMPTY_JOB_VALUES = {
   title: "",
-  department: "",
+  industry: "",
   location: "",
   employmentType: "",
   experienceLevel: "",
@@ -46,6 +48,7 @@ const EMPTY_JOB_VALUES = {
 
   requireSkillAssessment: false,
   assessmentType: "Job-Specific Skill Assessment",
+  status: "Draft",
 };
 
 /* ---------------------------------------------------------
@@ -184,6 +187,45 @@ export default function CreateJobPage() {
   const toastTimerRef = useRef(null);
 
   const requireSkillAssessment = watch("requireSkillAssessment");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const [isLoadingJob, setIsLoadingJob] = useState(Boolean(editId));
+
+  const toFormValues = (job) =>
+    normalizeDraft({
+      ...job,
+      salaryMin: job.salaryMin ?? "",
+      salaryMax: job.salaryMax ?? "",
+      status: job.status || "Draft",
+      requiredSkills: (job.requiredSkills || []).map((value) => ({ value })),
+      preferredSkills: (job.preferredSkills || []).map((value) => ({ value })),
+    });
+
+  useEffect(() => {
+    let alive = true;
+    if (!editId) {
+      setIsLoadingJob(false);
+      return () => {
+        alive = false;
+      };
+    }
+    (async () => {
+      try {
+        const { data } = await api.get(`/recruiter/jobs/${editId}`);
+        if (alive) reset(toFormValues(data.job));
+      } catch (error) {
+        if (error.response?.status === 401) router.replace("/login");
+        else
+          showToast(error.response?.data?.message || "Unable to load this job");
+      } finally {
+        if (alive) setIsLoadingJob(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [editId, reset, router]);
 
   /* -------------------------------------------------------
      Load Explicitly Saved Draft
@@ -191,22 +233,6 @@ export default function CreateJobPage() {
      No sample/default job is loaded.
      Only a recruiter-created draft is restored.
   ------------------------------------------------------- */
-
-  useEffect(() => {
-    try {
-      const savedDraft = window.localStorage.getItem(
-        "resumeai-recruiter-job-draft",
-      );
-
-      if (!savedDraft) return;
-
-      const parsedDraft = JSON.parse(savedDraft);
-
-      reset(normalizeDraft(parsedDraft));
-    } catch (err) {
-      console.error("Unable to load saved draft:", err);
-    }
-  }, [reset]);
 
   /* -------------------------------------------------------
      Cleanup Toast Timer
@@ -315,20 +341,19 @@ export default function CreateJobPage() {
      Save Draft
   ------------------------------------------------------- */
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     try {
-      const currentData = getValues();
-      const serializedJob = serializeJob(currentData);
-
-      window.localStorage.setItem(
-        "resumeai-recruiter-job-draft",
-        JSON.stringify(serializedJob),
-      );
-
+      const serializedJob = serializeJob(getValues());
+      const payload = { ...serializedJob, status: "Draft" };
+      const { data } = editId
+        ? await api.patch(`/recruiter/jobs/${editId}`, payload)
+        : await api.post("/recruiter/jobs", payload);
       showToast("Job draft saved successfully");
-    } catch (err) {
-      console.error("Unable to save draft:", err);
-      showToast("Unable to save draft");
+      if (!editId && data.job?._id) {
+        router.replace(`/dashboard/recruiter/jobs/create?edit=${data.job._id}`);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message || "Unable to save draft");
     }
   };
 
@@ -338,24 +363,10 @@ export default function CreateJobPage() {
 
   const handleCancel = () => {
     const shouldReset = window.confirm(
-      "Discard your current changes and reset the job form?",
+      "Discard your current changes and return to My Jobs?",
     );
-
     if (!shouldReset) return;
-
-    reset(EMPTY_JOB_VALUES);
-
-    setNewRequiredSkill("");
-    setNewPreferredSkill("");
-
-    setShowRequiredInput(false);
-    setShowPreferredInput(false);
-
-    setPublished(false);
-
-    clearErrors();
-
-    showToast("Changes discarded");
+    router.push("/dashboard/recruiter/jobs");
   };
 
   /* -------------------------------------------------------
@@ -371,10 +382,10 @@ export default function CreateJobPage() {
       return false;
     }
 
-    if (!data.department.trim()) {
-      setError("department", {
+    if (!data.industry.trim()) {
+      setError("industry", {
         type: "manual",
-        message: "Please enter a department.",
+        message: "Please enter a industry.",
       });
       return false;
     }
@@ -437,43 +448,44 @@ export default function CreateJobPage() {
   const handlePublish = async (data) => {
     clearErrors();
 
-    if (!validateJob(data)) {
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth",
-      });
+    const selectedStatus = data.status || "Draft";
 
+    // Only require complete job information when activating a job.
+    if (selectedStatus === "Active" && !validateJob(data)) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     setIsPublishing(true);
 
-    window.setTimeout(() => {
-      try {
-        const serializedJob = serializeJob(data);
+    try {
+      const payload = {
+        ...serializeJob(data),
+        status: selectedStatus,
+      };
 
-        window.localStorage.setItem(
-          "resumeai-published-job",
-          JSON.stringify({
-            ...serializedJob,
-            publishedAt: new Date().toISOString(),
-            status: "Active",
-          }),
-        );
-
-        window.localStorage.removeItem("resumeai-recruiter-job-draft");
-
-        setIsPublishing(false);
-        setPublished(true);
-
-        showToast("Job published successfully");
-      } catch (err) {
-        console.error("Unable to publish job:", err);
-
-        setIsPublishing(false);
-        showToast("Unable to publish job");
+      if (editId) {
+        await api.patch(`/recruiter/jobs/${editId}`, payload);
+      } else {
+        await api.post("/recruiter/jobs", payload);
       }
-    }, 700);
+
+      setPublished(selectedStatus === "Active");
+
+      showToast(
+        selectedStatus === "Active"
+          ? "Job published successfully"
+          : selectedStatus === "Closed"
+            ? "Job closed successfully"
+            : "Job saved as draft successfully",
+      );
+
+      router.push("/dashboard/recruiter/jobs");
+    } catch (error) {
+      showToast(error.response?.data?.message || "Unable to save job");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   /* -------------------------------------------------------
@@ -482,7 +494,7 @@ export default function CreateJobPage() {
 
   const firstError =
     errors.title?.message ||
-    errors.department?.message ||
+    errors.industry?.message ||
     errors.location?.message ||
     errors.employmentType?.message ||
     errors.experienceLevel?.message ||
@@ -527,7 +539,9 @@ export default function CreateJobPage() {
             <div className="mb-1 flex items-center gap-1.5 text-[10px] text-[#71839E] sm:text-[11px]">
               <span>Jobs</span>
               <span>/</span>
-              <span className="font-medium text-[#5146E5]">Create Job</span>
+              <span className="font-medium text-[#5146E5]">
+                {editId ? "Edit Job" : "Create Job"}
+              </span>
             </div>
 
             <h1 className="text-[20px] font-bold tracking-[-0.02em] text-[#172033] sm:text-[22px] lg:text-[24px]">
@@ -586,6 +600,12 @@ export default function CreateJobPage() {
           </div>
         )}
 
+        {isLoadingJob && (
+          <div className="mb-4 rounded-lg bg-white p-6 text-center text-sm text-[#64748b]">
+            Loading job details...
+          </div>
+        )}
+
         {/* ---------------------------------------------------
             Basic Information
         --------------------------------------------------- */}
@@ -624,18 +644,18 @@ export default function CreateJobPage() {
               />
             </label>
 
-            {/* Department */}
+            {/* Industry */}
             <label className="block sm:col-span-2 lg:col-span-3">
               <span className="mb-1.5 block text-[9px] font-semibold text-[#172033] sm:text-[10px]">
-                Department
+                Industry
               </span>
 
               <input
                 type="text"
-                {...register("department")}
-                placeholder="Enter department"
+                {...register("industry")}
+                placeholder="Enter industry"
                 className={`h-[38px] w-full rounded-[7px] border bg-white px-3 text-[10px] text-[#172033] outline-none transition placeholder:text-[#A0AEC0] focus:border-[#5146E5] focus:ring-2 focus:ring-[#5146E5]/10 sm:h-[40px] sm:text-[11px] ${
-                  errors.department ? "border-[#EF4444]" : "border-[#DCE4EE]"
+                  errors.industry ? "border-[#EF4444]" : "border-[#DCE4EE]"
                 }`}
               />
             </label>
@@ -703,6 +723,27 @@ export default function CreateJobPage() {
                 <option value="3–5 Years">3–5 Years</option>
                 <option value="5–8 Years">5–8 Years</option>
                 <option value="8+ Years">8+ Years</option>
+              </select>
+
+              <ChevronDown
+                size={13}
+                className="pointer-events-none absolute bottom-[12px] right-3 text-[#94A3B8]"
+              />
+            </label>
+
+            {/* Job Status */}
+            <label className="relative block sm:col-span-2 lg:col-span-2">
+              <span className="mb-1.5 block text-[9px] font-semibold text-[#172033] sm:text-[10px]">
+                Job Status <span className="text-[#EF4444]">*</span>
+              </span>
+
+              <select
+                {...register("status")}
+                className="h-[38px] w-full appearance-none rounded-[7px] border border-[#DCE4EE] bg-white px-3 pr-8 text-[10px] text-[#172033] outline-none transition focus:border-[#5146E5] focus:ring-2 focus:ring-[#5146E5]/10 sm:h-[40px] sm:text-[11px]"
+              >
+                <option value="Draft">Draft</option>
+                <option value="Active">Active</option>
+                <option value="Closed">Closed</option>
               </select>
 
               <ChevronDown
@@ -1184,15 +1225,6 @@ export default function CreateJobPage() {
 
               <button
                 type="button"
-                onClick={handleSaveDraft}
-                className="flex h-[36px] items-center justify-center gap-1.5 rounded-[7px] border border-[#DCE4EE] bg-white px-4 text-[9px] font-semibold text-[#52627B] transition hover:border-[#C7D2FE] hover:text-[#5146E5] sm:text-[10px]"
-              >
-                <Save size={12} strokeWidth={1.8} />
-                Save Draft
-              </button>
-
-              <button
-                type="button"
                 disabled={isPublishing}
                 onClick={handleSubmit(handlePublish)}
                 className="col-span-2 flex h-[38px] items-center justify-center gap-2 rounded-[7px] bg-[#5146E5] px-6 text-[10px] font-bold text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:bg-[#453BCF] disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-1 sm:h-[36px] sm:text-[10px]"
@@ -1200,12 +1232,16 @@ export default function CreateJobPage() {
                 {isPublishing ? (
                   <>
                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    Publishing...
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <Send size={13} strokeWidth={1.8} />
-                    Publish Job
+                    <Save size={13} strokeWidth={1.8} />
+                    {watch("status") === "Active"
+                      ? "Publish Job"
+                      : watch("status") === "Closed"
+                        ? "Close Job"
+                        : "Save as Draft"}
                   </>
                 )}
               </button>

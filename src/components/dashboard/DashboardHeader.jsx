@@ -1,5 +1,6 @@
 "use client";
 
+import { LogOut } from "lucide-react";
 import {
   ArrowRightFromLine,
   Bell,
@@ -22,6 +23,8 @@ export default function DashboardHeader({
   interview = false,
   mobileSidebarOpen = false,
   onMenuClick = () => {},
+  onLogout = () => {},
+  loggingOut = false,
   user,
 }) {
   /*
@@ -33,17 +36,39 @@ export default function DashboardHeader({
   const defaultUser =
     role === "recruiter"
       ? {
-          name: "Anita Mehta",
-          initials: "AM",
+          name: "Recruiter",
+          initials: "R",
           role: "Recruiter",
+          email: "",
         }
       : {
-          name: "Rahul Sharma",
-          initials: "RS",
+          name: "Student",
+          initials: "S",
           role: "Student",
+          email: "",
         };
 
-  const currentUser = user || defaultUser;
+  const currentUser = {
+    ...defaultUser,
+    ...(user || {}),
+    name: user?.fullName || user?.name || defaultUser.name,
+    role:
+      user?.role === "recruiter"
+        ? "Recruiter"
+        : user?.role === "student"
+          ? "Student"
+          : defaultUser.role,
+    initials:
+      user?.initials ||
+      (user?.fullName || user?.name || "")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join("") ||
+      defaultUser.initials,
+    email: user?.email || "",
+  };
 
   const isRecruiter = role === "recruiter";
 
@@ -667,6 +692,37 @@ export default function DashboardHeader({
           >
             {currentUser.initials}
           </div>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            disabled={loggingOut}
+            aria-label="Log out"
+            title="Log out"
+            className="
+    flex
+    h-[36px]
+    items-center
+    justify-center
+    gap-2
+    rounded-[9px]
+    border
+    border-[#DCE4EE]
+    bg-white
+    px-3
+    text-[12px]
+    font-medium
+    text-[#64748B]
+    transition
+    hover:border-red-200
+    hover:bg-red-50
+    hover:text-red-600
+    disabled:cursor-not-allowed
+    disabled:opacity-50
+  "
+          >
+            <LogOut size={16} strokeWidth={1.7} />
+          </button>
         </div>
       </div>
     </header>

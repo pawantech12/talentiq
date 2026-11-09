@@ -6,6 +6,7 @@ import {
   FileText,
   LayoutGrid,
   Lightbulb,
+  LogOut,
   MessageSquare,
   Search,
   Sparkles,
@@ -70,7 +71,6 @@ const studentNavigation = [
 /*
  * ============================================================
  * RECRUITER NAVIGATION
- * Matches uploaded recruiter dashboard design.
  * ============================================================
  */
 
@@ -114,34 +114,17 @@ const recruiterNavigation = [
 
 /*
  * ============================================================
- * USER DATA
- * ============================================================
- */
-
-const users = {
-  student: {
-    name: "Rahul Sharma",
-    initials: "RS",
-    role: "Student",
-  },
-
-  recruiter: {
-    name: "Anita Mehta",
-    initials: "AM",
-    role: "Recruiter",
-  },
-};
-
-/*
- * ============================================================
  * COMPONENT
  * ============================================================
  */
 
 export default function DashboardSidebar({
   role = "student",
+  user: authenticatedUser = null,
   mobileSidebarOpen = false,
   onMobileClose = () => {},
+  onLogout = () => {},
+  loggingOut = false,
 }) {
   const pathname = usePathname();
 
@@ -149,7 +132,49 @@ export default function DashboardSidebar({
 
   const navigation = isRecruiter ? recruiterNavigation : studentNavigation;
 
-  const user = isRecruiter ? users.recruiter : users.student;
+  /*
+   * ============================================================
+   * AUTHENTICATED USER DATA
+   * ============================================================
+   */
+
+  const defaultUser = isRecruiter
+    ? {
+        name: "Recruiter",
+        initials: "R",
+        role: "Recruiter",
+        email: "",
+      }
+    : {
+        name: "Student",
+        initials: "S",
+        role: "Student",
+        email: "",
+      };
+
+  const fullName =
+    authenticatedUser?.fullName || authenticatedUser?.name || defaultUser.name;
+
+  const generatedInitials = fullName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
+  const currentUser = {
+    ...defaultUser,
+    name: fullName,
+    initials:
+      authenticatedUser?.initials || generatedInitials || defaultUser.initials,
+    role:
+      authenticatedUser?.role === "recruiter"
+        ? "Recruiter"
+        : authenticatedUser?.role === "student"
+          ? "Student"
+          : defaultUser.role,
+    email: authenticatedUser?.email || "",
+  };
 
   /*
    * ============================================================
@@ -186,6 +211,18 @@ export default function DashboardSidebar({
         studentNavigation[3], // Resume
         studentNavigation[7], // Profile
       ];
+
+  /*
+   * ============================================================
+   * LOGOUT HANDLER
+   * ============================================================
+   */
+
+  const handleLogout = () => {
+    if (loggingOut) return;
+
+    onLogout();
+  };
 
   return (
     <>
@@ -225,7 +262,6 @@ export default function DashboardSidebar({
           ].join(" ")}
         >
           <Link href="/" className="flex items-center gap-[10px]">
-            {/* Logo square */}
             <div
               className="
                 flex
@@ -362,7 +398,7 @@ export default function DashboardSidebar({
                 text-[#5146E5]
               "
             >
-              {user.initials}
+              {currentUser.initials}
             </div>
 
             <div className="min-w-0">
@@ -375,7 +411,7 @@ export default function DashboardSidebar({
                   text-[#111827]
                 "
               >
-                {user.name}
+                {currentUser.name}
               </p>
 
               <p
@@ -385,10 +421,39 @@ export default function DashboardSidebar({
                   text-[#71839E]
                 "
               >
-                {user.role}
+                {currentUser.role}
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            aria-label="Log out"
+            className="
+              mt-4
+              flex
+              w-full
+              items-center
+              gap-2
+              rounded-[8px]
+              px-2
+              py-2
+              text-[12px]
+              font-medium
+              text-[#64748B]
+              transition
+              hover:bg-red-50
+              hover:text-red-600
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+          >
+            <LogOut size={16} strokeWidth={1.7} />
+
+            {loggingOut ? "Logging out..." : "Logout"}
+          </button>
         </div>
       </aside>
 
@@ -604,19 +669,20 @@ export default function DashboardSidebar({
                 text-[#5146E5]
               "
             >
-              {user.initials}
+              {currentUser.initials}
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p
                 className="
+                  truncate
                   text-[12px]
                   font-[600]
                   leading-[16px]
                   text-[#111827]
                 "
               >
-                {user.name}
+                {currentUser.name}
               </p>
 
               <p
@@ -626,10 +692,39 @@ export default function DashboardSidebar({
                   text-[#71839E]
                 "
               >
-                {user.role}
+                {currentUser.role}
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            aria-label="Log out"
+            className="
+              mt-4
+              flex
+              w-full
+              items-center
+              gap-2
+              rounded-[8px]
+              px-2
+              py-2
+              text-[12px]
+              font-medium
+              text-[#64748B]
+              transition
+              hover:bg-red-50
+              hover:text-red-600
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+            "
+          >
+            <LogOut size={16} strokeWidth={1.7} />
+
+            {loggingOut ? "Logging out..." : "Logout"}
+          </button>
         </div>
       </aside>
 

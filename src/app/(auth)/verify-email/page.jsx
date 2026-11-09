@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 import {
   ArrowRight,
@@ -13,17 +16,35 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function VerifyEmailPage() {
-  // Start with all OTP fields empty
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-
+  const router = useRouter();
+  const {
+    register,
+    setValue,
+    watch,
+    handleSubmit,
+    formState: { errors: formErrors, isSubmitting },
+  } = useForm({
+    defaultValues: { code: "" },
+    mode: "onSubmit",
+  });
+  const code = watch("code") || "";
+  const otp = Array.from({ length: 6 }, (_, index) => code[index] || "");
+  const [email, setEmail] = useState("");
   const [seconds, setSeconds] = useState(30);
   const [isResending, setIsResending] = useState(false);
-
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const inputRefs = useRef([]);
 
   /* ------------------------------------------------------------
      RESEND COUNTDOWN
   ------------------------------------------------------------ */
+
+  useEffect(() => {
+    const queryEmail = new URLSearchParams(window.location.search).get("email");
+    const savedEmail = window.sessionStorage.getItem("resumeai_pending_email");
+    setEmail((queryEmail || savedEmail || "").toLowerCase());
+  }, []);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -51,8 +72,7 @@ export default function VerifyEmailPage() {
 
     const updatedOtp = [...otp];
     updatedOtp[index] = numericValue;
-
-    setOtp(updatedOtp);
+    setValue("code", updatedOtp.join(""), { shouldValidate: false });
 
     if (numericValue && index < 5) {
       inputRefs.current[index + 1]?.focus();
@@ -99,7 +119,7 @@ export default function VerifyEmailPage() {
       updatedOtp[index] = digit;
     });
 
-    setOtp(updatedOtp);
+    setValue("code", updatedOtp.join(""), { shouldValidate: false });
 
     const nextIndex = Math.min(pastedValue.length, 5);
 
@@ -110,34 +130,60 @@ export default function VerifyEmailPage() {
      RESEND OTP
   ------------------------------------------------------------ */
 
-  const handleResend = () => {
-    if (seconds > 0 || isResending) return;
-
+  const handleResend = async () => {
+    if (seconds > 0 || isResending || !email) return;
     setIsResending(true);
-
-    setTimeout(() => {
-      // Clear all OTP fields after resend
-      setOtp(["", "", "", "", "", ""]);
-
-      setSeconds(30);
-      setIsResending(false);
-
+    setError("");
+    setMessage("");
+    try {
+      const response = await axios.post("/api/auth/resend-otp", { email });
+      setValue("code", "");
+      setSeconds(response.data?.resendAfterSeconds || 30);
+      setMessage("A new verification code has been sent to your email.");
       inputRefs.current[0]?.focus();
-    }, 500);
+    } catch (requestError) {
+      setError(
+        requestError?.response?.data?.message ||
+          "Unable to resend the code. Please try again.",
+      );
+      if (requestError?.response?.data?.retryAfterSeconds) {
+        setSeconds(requestError.response.data.retryAfterSeconds);
+      }
+    } finally {
+      setIsResending(false);
+    }
   };
 
   /* ------------------------------------------------------------
      VERIFY
   ------------------------------------------------------------ */
 
-  const handleVerify = (event) => {
-    event.preventDefault();
-
-    const verificationCode = otp.join("");
-
-    console.log("Verification code:", verificationCode);
-
-    // Add your API verification logic here.
+  const handleVerify = async ({ code: verificationCode }) => {
+    setError("");
+    setMessage("");
+    if (!email) {
+      setError(
+        "Registration email was not found. Please return to registration and try again.",
+      );
+      return;
+    }
+    try {
+      const response = await axios.post("/api/auth/verify-email", {
+        email,
+        code: verificationCode,
+      });
+      window.sessionStorage.removeItem("resumeai_pending_email");
+      const destination =
+        response.data?.role === "recruiter"
+          ? "/dashboard/recruiter"
+          : "/dashboard/student";
+      router.replace(destination);
+    } catch (requestError) {
+      setError(
+        requestError?.response?.data?.message ||
+          "The code could not be verified. Please try again.",
+      );
+    }
   };
 
   return (
@@ -184,7 +230,7 @@ export default function VerifyEmailPage() {
           <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-[#C7D2FE] bg-[#EEF2FF] px-3.5 py-1 text-[13px] font-semibold text-[#5146E5]">
             <Mail size={13} strokeWidth={1.8} />
 
-            <span>pawan@example.com</span>
+            <span>{email || "your email address"}</span>
           </div>
         </div>
 
@@ -194,7 +240,15 @@ export default function VerifyEmailPage() {
 
         {/* FORM */}
 
-        <form onSubmit={handleVerify} className="mt-6">
+        <form onSubmit={handleSubmit(handleVerify)} className="mt-6">
+          <input
+            type="hidden"
+            {...register("code", {
+              required: "Enter the 6-digit code.",
+              validate: (value) =>
+                /^\d{6}$/.test(value) || "Enter all 6 digits.",
+            })}
+          />
           {/* OTP LABEL */}
 
           <label className="block text-[13px] font-semibold text-[#172033]">
@@ -248,6 +302,22 @@ export default function VerifyEmailPage() {
               />
             ))}
           </div>
+          {(error || formErrors.code) && (
+            <p
+              role="alert"
+              className="mt-2 text-center text-[12px] text-red-500"
+            >
+              {error || formErrors.code?.message}
+            </p>
+          )}
+          {message && (
+            <p
+              role="status"
+              className="mt-2 text-center text-[12px] text-green-600"
+            >
+              {message}
+            </p>
+          )}
 
           {/* RESEND */}
 
@@ -284,9 +354,10 @@ export default function VerifyEmailPage() {
 
           <button
             type="submit"
+            disabled={isSubmitting || !email}
             className="mt-8 flex h-[52px] w-full items-center justify-center gap-2 rounded-[10px] bg-gradient-to-r from-[#39309B] to-[#5146E5] text-[15px] font-semibold text-white shadow-[0_7px_18px_rgba(79,70,229,0.25)] transition-all hover:from-[#31288D] hover:to-[#473BD7] active:scale-[0.99] sm:mt-7"
           >
-            <span>Verify Email</span>
+            <span>{isSubmitting ? "Verifying..." : "Verify Email"}</span>
 
             <ArrowRight size={19} strokeWidth={2} />
           </button>

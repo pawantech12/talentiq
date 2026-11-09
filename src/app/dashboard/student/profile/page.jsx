@@ -22,59 +22,47 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useStudentProfile } from "./useStudentProfile.js";
+import ProfileProjectForms from "./ProfileProjectForms.jsx";
+import api from "@/lib/api.js";
 
 export default function StudentProfilePage() {
   const resumeInputRef = useRef(null);
 
-  const [profile, setProfile] = useState({
-    name: "Rahul Sharma",
-    role: "Full Stack Developer",
-    email: "rahul.sharma@email.com",
-    phone: "+91 98765 43210",
-    location: "Mumbai, Maharashtra",
-    dob: "15 June 2002",
-    currentRole: "Student / Aspiring Full Stack Developer",
-    careerGoal: "Full Stack Developer",
-    preferredLocation: "Mumbai / Remote",
-    experienceLevel: "Fresher",
-    expectedRole: "Full Stack Developer",
-  });
+  const {
+    profile,
+    setProfile,
+    loading,
+    saving,
+    error,
+    loadProfile,
+    updateProfile,
+    saveProject,
+    deleteProject,
+    savePortfolioLink,
+    deletePortfolioLink,
+    saveExperience,
+    deleteExperience,
 
-  const [skills, setSkills] = useState([
-    "JavaScript",
-    "React",
-    "Next.js",
-    "Node.js",
-    "Express.js",
-    "MongoDB",
-    "HTML",
-    "CSS",
-    "Tailwind CSS",
-    "Git",
-  ]);
+    saveEducation,
+    deleteEducation,
+  } = useStudentProfile();
 
-  const [profileCompletion, setProfileCompletion] = useState(85);
+  const [projectModal, setProjectModal] = useState(false);
+  const [portfolioModal, setPortfolioModal] = useState(false);
 
-  const [experience, setExperience] = useState({
-    title: "Full Stack Developer Intern",
-    company: "Technology Company",
-    duration: "3 Months",
-    description:
-      "Worked on frontend and backend web application development using React and Node.js.",
-  });
+  const [editingProject, setEditingProject] = useState(null);
+  const [editingPortfolio, setEditingPortfolio] = useState(null);
 
-  const [education, setEducation] = useState({
-    degree: "Master of Computer Applications",
-    university: "Chhatrapati Shivaji Maharaj University",
-    period: "2025 – Present",
-  });
+  const [showToast, setShowToast] = useState("");
+  const [resumeUploading, setResumeUploading] = useState(false);
 
-  const [resume, setResume] = useState({
-    name: "ResumeAI_Resume_Rahul.pdf",
-    type: "PDF",
-    uploaded: "Uploaded 12 Aug 2026",
-  });
+  const [experienceModal, setExperienceModal] = useState(false);
+  const [educationModal, setEducationModal] = useState(false);
+
+  const [editingExperience, setEditingExperience] = useState(null);
+  const [editingEducation, setEditingEducation] = useState(null);
 
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showSectionEditor, setShowSectionEditor] = useState(null);
@@ -82,12 +70,6 @@ export default function StudentProfilePage() {
   const [showExperienceEditor, setShowExperienceEditor] = useState(false);
   const [showEducationEditor, setShowEducationEditor] = useState(false);
   const [showResumePreview, setShowResumePreview] = useState(false);
-  const [showToast, setShowToast] = useState("");
-  const [newSkill, setNewSkill] = useState("");
-
-  const [draftProfile, setDraftProfile] = useState(profile);
-  const [draftExperience, setDraftExperience] = useState(experience);
-  const [draftEducation, setDraftEducation] = useState(education);
 
   const notify = (message) => {
     setShowToast(message);
@@ -99,57 +81,211 @@ export default function StudentProfilePage() {
     }, 2200);
   };
 
+  const [draftProfile, setDraftProfile] = useState({});
+  const [newSkill, setNewSkill] = useState("");
+
+  const [draftExperience, setDraftExperience] = useState({
+    title: "",
+    company: "",
+    duration: "",
+    description: "",
+  });
+
+  const [draftEducation, setDraftEducation] = useState({
+    degree: "",
+    university: "",
+    period: "",
+  });
+
+  const skills = profile.skills || [];
+  const projects = profile.projects || [];
+  const portfolioLinks = profile.portfolioLinks || [];
+  const experiences = profile.experiences || [];
+  const education = profile.education || [];
+  const resume = profile.resume;
+
+  const [editingExperienceId, setEditingExperienceId] = useState(null);
+  const [editingEducationId, setEditingEducationId] = useState(null);
+
+  const profileCompletion = useMemo(() => {
+    const checks = [
+      Boolean(profile.fullName?.trim()),
+      Boolean(profile.email?.trim()),
+      Boolean(profile.phone?.trim()),
+      Boolean(profile.location?.trim()),
+      Boolean(profile.dob),
+      Boolean(profile.role?.trim()),
+      Boolean(profile.currentRole?.trim()),
+      Boolean(profile.careerGoal?.trim()),
+      Boolean(profile.preferredLocation?.trim()),
+      Boolean(profile.expectedRole?.trim()),
+      Boolean(profile.experienceLevel?.trim()),
+      skills.length > 0,
+      education.length > 0,
+      experiences.length > 0,
+      projects.length > 0,
+      portfolioLinks.length > 0,
+      Boolean(resume?.publicId),
+    ];
+
+    const completed = checks.filter(Boolean).length;
+
+    return Math.round((completed / checks.length) * 100);
+  }, [
+    profile,
+    skills.length,
+    education.length,
+    experiences.length,
+    projects.length,
+    portfolioLinks.length,
+    resume,
+  ]);
+
+  const openExperienceEditor = (experience = null) => {
+    setEditingExperience(experience);
+    setExperienceModal(true);
+  };
+
+  const handleSaveExperience = async (experience) => {
+    try {
+      await saveExperience(experience);
+
+      setExperienceModal(false);
+      setEditingExperience(null);
+
+      notify("Experience saved successfully");
+    } catch (error) {
+      notify(error.message || "Unable to save experience");
+    }
+  };
+
+  const handleDeleteExperience = async (experienceId) => {
+    if (!window.confirm("Are you sure you want to delete this experience?")) {
+      return;
+    }
+
+    try {
+      await deleteExperience(experienceId);
+
+      notify("Experience deleted successfully");
+    } catch (error) {
+      notify(error.message || "Unable to delete experience");
+    }
+  };
+
+  const handleSaveEducation = async (educationItem) => {
+    try {
+      await saveEducation(educationItem);
+
+      setEducationModal(false);
+      setEditingEducation(null);
+
+      notify("Education saved successfully");
+    } catch (error) {
+      notify(error.message || "Unable to save education");
+    }
+  };
+
+  const handleDeleteEducation = async (educationId) => {
+    if (
+      !window.confirm("Are you sure you want to delete this education record?")
+    ) {
+      return;
+    }
+
+    try {
+      await deleteEducation(educationId);
+
+      notify("Education deleted successfully");
+    } catch (error) {
+      notify(error.message || "Unable to delete education");
+    }
+  };
+
+  const openEducationEditor = (educationItem = null) => {
+    setEditingEducation(educationItem);
+    setEducationModal(true);
+  };
+
   const openProfileEditor = () => {
-    setDraftProfile(profile);
+    setDraftProfile({ ...profile });
     setShowProfileEditor(true);
   };
 
-  const saveProfile = () => {
-    setProfile(draftProfile);
-    setShowProfileEditor(false);
-    notify("Profile updated successfully");
-  };
-
   const openSectionEditor = (section) => {
+    setDraftProfile({ ...profile });
     setShowSectionEditor(section);
+  };
 
-    if (section === "personal") {
-      setDraftProfile(profile);
-    }
+  const saveProfile = async () => {
+    try {
+      await updateProfile({
+        fullName: draftProfile.fullName,
+        role: draftProfile.role,
+      });
 
-    if (section === "career") {
-      setDraftProfile(profile);
+      setShowProfileEditor(false);
+      notify("Profile updated successfully");
+    } catch (err) {
+      notify(err.message);
     }
   };
 
-  const saveSection = () => {
-    setProfile(draftProfile);
-    setShowSectionEditor(null);
-    setShowProfileEditor(false);
-    notify("Information updated successfully");
+  const saveSection = async () => {
+    try {
+      const fields =
+        showSectionEditor === "personal"
+          ? {
+              phone: draftProfile.phone,
+              location: draftProfile.location,
+              dob: draftProfile.dob,
+            }
+          : {
+              currentRole: draftProfile.currentRole,
+              careerGoal: draftProfile.careerGoal,
+              preferredLocation: draftProfile.preferredLocation,
+              experienceLevel: draftProfile.experienceLevel,
+              expectedRole: draftProfile.expectedRole,
+            };
+
+      await updateProfile(fields);
+
+      setShowSectionEditor(null);
+      notify("Information updated successfully");
+    } catch (err) {
+      notify(err.message);
+    }
   };
 
   const addSkill = () => {
-    const trimmedSkill = newSkill.trim();
+    const value = newSkill.trim();
 
-    if (!trimmedSkill) return;
+    if (!value) return;
 
-    if (skills.includes(trimmedSkill)) {
+    if (skills.some((skill) => skill.toLowerCase() === value.toLowerCase())) {
       notify("Skill already added");
       return;
     }
 
-    if (skills.length >= 15) {
-      notify("You can add up to 15 skills");
+    if (skills.length >= 50) {
+      notify("Maximum 50 skills allowed");
       return;
     }
 
-    setSkills((current) => [...current, trimmedSkill]);
-    setNewSkill("");
+    setProfileSkills([...skills, value]);
   };
 
-  const removeSkill = (skillToRemove) => {
-    setSkills((current) => current.filter((skill) => skill !== skillToRemove));
+  async function setProfileSkills(nextSkills) {
+    try {
+      await updateProfile({ skills: nextSkills });
+      setNewSkill("");
+    } catch (err) {
+      notify(err.message);
+    }
+  }
+
+  const removeSkill = async (skillToRemove) => {
+    await setProfileSkills(skills.filter((skill) => skill !== skillToRemove));
   };
 
   const saveSkills = () => {
@@ -157,54 +293,119 @@ export default function StudentProfilePage() {
     notify("Skills updated successfully");
   };
 
-  const openExperienceEditor = () => {
-    setDraftExperience(experience);
-    setShowExperienceEditor(true);
+  const handleSaveProject = async (project) => {
+    try {
+      await saveProject(project);
+
+      setProjectModal(false);
+      setEditingProject(null);
+
+      notify("Project saved successfully");
+    } catch (error) {
+      notify(error.message);
+    }
   };
 
-  const saveExperience = () => {
-    setExperience(draftExperience);
-    setShowExperienceEditor(false);
-    notify("Experience updated successfully");
+  const handleDeleteProject = async (projectId) => {
+    if (!window.confirm("Delete this project?")) return;
+
+    try {
+      await deleteProject(projectId);
+      notify("Project deleted successfully");
+    } catch (error) {
+      notify(error.message);
+    }
   };
 
-  const openEducationEditor = () => {
-    setDraftEducation(education);
-    setShowEducationEditor(true);
+  const handleSavePortfolio = async (link) => {
+    try {
+      await savePortfolioLink(link);
+
+      setPortfolioModal(false);
+      setEditingPortfolio(null);
+
+      notify("Portfolio link saved successfully");
+    } catch (error) {
+      notify(error.message);
+    }
   };
 
-  const saveEducation = () => {
-    setEducation(draftEducation);
-    setShowEducationEditor(false);
-    notify("Education updated successfully");
+  const handleDeletePortfolio = async (linkId) => {
+    if (!window.confirm("Delete this portfolio link?")) return;
+
+    try {
+      await deletePortfolioLink(linkId);
+      notify("Portfolio link deleted successfully");
+    } catch (error) {
+      notify(error.message);
+    }
   };
 
-  const handleResumeSelect = (event) => {
+  const handleResumeSelect = async (event) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
-    const extension = file.name.split(".").pop()?.toUpperCase() || "FILE";
+    if (file.type !== "application/pdf") {
+      notify("Please upload a PDF resume");
+      event.target.value = "";
+      return;
+    }
 
-    setResume({
-      name: file.name,
-      type: extension,
-      uploaded: `Uploaded ${new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })}`,
-    });
+    if (file.size > 5 * 1024 * 1024) {
+      notify("Resume must be smaller than 5 MB");
+      event.target.value = "";
+      return;
+    }
 
-    notify("Resume uploaded successfully");
+    try {
+      setResumeUploading(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", "resume");
+
+      const uploadResponse = await api.post("/profile/upload", formData);
+
+      await api.patch("/profile/resume", {
+        file: uploadResponse.data.file,
+      });
+
+      await loadProfile();
+
+      notify("Resume uploaded successfully");
+    } catch (err) {
+      notify(
+        err.response?.data?.message || err.message || "Resume upload failed",
+      );
+    } finally {
+      setResumeUploading(false);
+      event.target.value = "";
+    }
   };
-
+  const resumePreviewUrl = "/api/profile/resume/view";
   const handleViewResume = () => {
+    if (!resume?.publicId) {
+      notify("Please upload a resume first");
+      return;
+    }
+
     setShowResumePreview(true);
   };
 
   const handleUpdateResume = () => {
     resumeInputRef.current?.click();
+  };
+
+  const handleDownloadResume = () => {
+    const link = document.createElement("a");
+
+    link.href = "/api/profile/resume/view";
+    link.download = resume?.originalName || "resume.pdf";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   return (
@@ -242,7 +443,12 @@ export default function StudentProfilePage() {
             {/* Avatar */}
             <div className="flex shrink-0 items-center gap-3 sm:block">
               <div className="flex h-[68px] w-[68px] items-center justify-center rounded-full bg-white text-[23px] font-bold text-[#5146E5] shadow-sm sm:h-[74px] sm:w-[74px] sm:text-[25px] lg:h-[82px] lg:w-[82px] lg:text-[28px]">
-                RS
+                {profile.fullName
+                  ?.trim()
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase())
+                  .join("") || "R"}
               </div>
 
               <div className="sm:hidden">
@@ -263,7 +469,7 @@ export default function StudentProfilePage() {
               </div>
 
               <h1 className="mt-2 text-[21px] font-bold leading-6 sm:text-[23px] lg:text-[25px]">
-                {profile.name}
+                {profile.fullName}
               </h1>
 
               <p className="mt-1 text-[13px] font-medium text-indigo-100 sm:text-[14px]">
@@ -271,12 +477,16 @@ export default function StudentProfilePage() {
               </p>
 
               <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-indigo-100 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:text-[12px]">
-                <span className="flex items-center gap-1.5">
-                  <MapPin size={12} strokeWidth={1.7} />
-                  {profile.location}
-                </span>
+                {profile.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin size={12} strokeWidth={1.7} />
+                    {profile.location}
+                  </span>
+                )}
 
-                <span className="hidden h-3 w-px bg-white/25 sm:block" />
+                {profile.location && (
+                  <span className="hidden h-3 w-px bg-white/25 sm:block" />
+                )}
 
                 <span className="flex items-center gap-1.5">
                   <Mail size={12} strokeWidth={1.7} />
@@ -326,7 +536,7 @@ export default function StudentProfilePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2">
                 {[
-                  ["Full Name", profile.name],
+                  ["Full Name", profile.fullName],
                   ["Email Address", profile.email],
                   ["Phone Number", profile.phone],
                   ["Location", profile.location],
@@ -469,42 +679,298 @@ export default function StudentProfilePage() {
 
                 <button
                   type="button"
-                  onClick={openEducationEditor}
+                  onClick={() => openEducationEditor()}
                   className="flex h-[30px] items-center gap-1.5 rounded-[6px] border border-[#DCE4EE] bg-white px-2.5 text-[11px] font-medium text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
                 >
-                  <Pencil size={12} />
-                  Edit
+                  <Plus size={12} />
+                  Add
                 </button>
               </div>
 
-              <div className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
-                    <GraduationCap size={18} strokeWidth={1.7} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
-                      <h3 className="text-[12px] font-bold leading-5 text-[#172033] sm:text-[13px]">
-                        {education.degree}
-                      </h3>
-
-                      <span className="w-fit rounded-full bg-[#EEF1FF] px-2.5 py-1 text-[9px] font-semibold text-[#5146E5]">
-                        Currently Studying
-                      </span>
-                    </div>
-
-                    <p className="mt-0.5 text-[11px] font-medium text-[#52627B] sm:text-[12px]">
-                      {education.university}
-                    </p>
-
-                    <p className="mt-1 flex items-center gap-1 text-[10px] text-[#8FA0B8] sm:text-[11px]">
-                      <CalendarDays size={11} />
-                      {education.period}
-                    </p>
-                  </div>
+              {education.length === 0 ? (
+                <div className="rounded-[8px] border border-dashed border-[#DCE4EE] p-5 text-center">
+                  <GraduationCap
+                    className="mx-auto mb-2 text-[#8FA0B8]"
+                    size={24}
+                  />
+                  <p className="text-[12px] font-semibold text-[#52627B]">
+                    No education added yet
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#8FA0B8]">
+                    Add your degree, university or academic qualifications.
+                  </p>
                 </div>
+              ) : (
+                <div className="space-y-3">
+                  {education.map((item, index) => (
+                    <div
+                      key={item._id || index}
+                      className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
+                          <GraduationCap size={18} strokeWidth={1.7} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="text-[12px] font-bold leading-5 text-[#172033] sm:text-[13px]">
+                                {item.degree}
+                              </h3>
+
+                              <p className="mt-0.5 text-[11px] font-medium text-[#52627B] sm:text-[12px]">
+                                {item.university}
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEducationEditor(item)}
+                                className="text-[#5146E5]"
+                                aria-label="Edit education"
+                              >
+                                <Pencil size={14} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteEducation(item._id)}
+                                className="text-red-500"
+                                aria-label="Delete education"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {item.period && (
+                            <p className="mt-2 flex items-center gap-1 text-[10px] text-[#8FA0B8] sm:text-[11px]">
+                              <CalendarDays size={11} />
+                              {item.period}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-sm sm:p-4 lg:p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[15px] font-bold text-[#172033]">
+                    Project Experience
+                  </h2>
+                  <p className="text-[10px] text-[#8FA0B8]">
+                    {projects.length} projects added
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProject(null);
+                    setProjectModal(true);
+                  }}
+                  className="flex h-[32px] items-center gap-1.5 rounded-[6px] bg-[#5146E5] px-3 text-[11px] font-semibold text-white"
+                >
+                  <Plus size={13} />
+                  Add Project
+                </button>
               </div>
+
+              {projects.length === 0 ? (
+                <div className="rounded-[8px] border border-dashed border-[#DCE4EE] p-5 text-center">
+                  <Code2 className="mx-auto mb-2 text-[#8FA0B8]" size={24} />
+                  <p className="text-[12px] font-semibold text-[#52627B]">
+                    No projects added yet
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#8FA0B8]">
+                    Add your academic, personal or professional projects.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {projects.map((project) => (
+                    <div
+                      key={project._id}
+                      className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-[13px] font-bold text-[#172033]">
+                            {project.title}
+                          </h3>
+
+                          <p className="mt-1 whitespace-pre-wrap text-[11px] leading-5 text-[#71839E]">
+                            {project.description}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingProject(project);
+                              setProjectModal(true);
+                            }}
+                            className="text-[#5146E5]"
+                            aria-label="Edit project"
+                          >
+                            <Pencil size={15} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProject(project._id)}
+                            className="text-red-500"
+                            aria-label="Delete project"
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {project.technologies?.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {project.technologies.map((technology) => (
+                            <span
+                              key={technology}
+                              className="rounded-[5px] bg-[#EEF1FF] px-2 py-1 text-[9px] font-semibold text-[#5146E5]"
+                            >
+                              {technology}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-semibold">
+                        {project.projectUrl && (
+                          <a
+                            href={project.projectUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#5146E5]"
+                          >
+                            Live Project ↗
+                          </a>
+                        )}
+
+                        {project.repositoryUrl && (
+                          <a
+                            href={project.repositoryUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#5146E5]"
+                          >
+                            Source Code ↗
+                          </a>
+                        )}
+                      </div>
+
+                      {project.media?.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {project.media.map((media) => (
+                            <img
+                              key={media.publicId}
+                              src={media.secureUrl}
+                              alt={`${project.title} screenshot`}
+                              className="h-16 w-20 rounded-md border border-[#DCE4EE] object-cover"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-sm sm:p-4 lg:p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h2 className="text-[15px] font-bold text-[#172033]">
+                    Portfolio Links
+                  </h2>
+                  <p className="text-[10px] text-[#8FA0B8]">
+                    {portfolioLinks.length} links added
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPortfolio(null);
+                    setPortfolioModal(true);
+                  }}
+                  className="flex h-[32px] items-center gap-1.5 rounded-[6px] bg-[#5146E5] px-3 text-[11px] font-semibold text-white"
+                >
+                  <Plus size={13} />
+                  Add Link
+                </button>
+              </div>
+
+              {portfolioLinks.length === 0 ? (
+                <p className="rounded-[8px] border border-dashed border-[#DCE4EE] p-4 text-center text-[11px] text-[#8FA0B8]">
+                  Add your GitHub, LinkedIn or portfolio website.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {portfolioLinks.map((link) => (
+                    <div
+                      key={link._id}
+                      className="flex items-center justify-between gap-3 rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-bold text-[#172033]">
+                          {link.title}
+                        </p>
+                        <p className="truncate text-[10px] text-[#8FA0B8]">
+                          {link.url}
+                        </p>
+                        <span className="text-[9px] font-semibold text-[#5146E5]">
+                          {link.type}
+                        </span>
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#5146E5]"
+                          aria-label="Open portfolio link"
+                        >
+                          <Eye size={15} />
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingPortfolio(link);
+                            setPortfolioModal(true);
+                          }}
+                          className="text-[#5146E5]"
+                          aria-label="Edit portfolio link"
+                        >
+                          <Pencil size={15} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePortfolio(link._id)}
+                          className="text-red-500"
+                          aria-label="Delete portfolio link"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
 
@@ -537,11 +1003,18 @@ export default function StudentProfilePage() {
 
               <div className="mt-1.5 flex items-center justify-between">
                 <span className="text-[10px] text-[#8FA0B8]">
-                  2 sections remaining
+                  {17 - Math.round((profileCompletion / 100) * 17)} sections
+                  remaining
                 </span>
 
                 <span className="text-[10px] font-semibold text-[#5146E5]">
-                  Almost Complete
+                  {profileCompletion === 100
+                    ? "Complete"
+                    : profileCompletion >= 75
+                      ? "Almost Complete"
+                      : profileCompletion >= 40
+                        ? "In Progress"
+                        : "Getting Started"}
                 </span>
               </div>
 
@@ -553,8 +1026,11 @@ export default function StudentProfilePage() {
               <div className="mt-3 space-y-2">
                 <button
                   type="button"
-                  onClick={() => notify("Project experience section opened")}
-                  className="flex h-[34px] w-full items-center gap-2 rounded-[7px] border border-[#F5B82E] bg-[#FFF2C7] px-3 text-left text-[10px] font-medium text-[#A85A00] transition hover:bg-[#FFEFB4]"
+                  onClick={() => {
+                    setEditingProject(null);
+                    setProjectModal(true);
+                  }}
+                  className="flex h-[34px] w-full items-center gap-2 rounded-[7px] border border-[#F5B82E] bg-[#FFF2C7] px-3 text-left text-[10px] font-medium text-[#A85A00]"
                 >
                   <Plus size={12} />
                   Add project experience
@@ -562,8 +1038,11 @@ export default function StudentProfilePage() {
 
                 <button
                   type="button"
-                  onClick={() => notify("Portfolio section opened")}
-                  className="flex h-[34px] w-full items-center gap-2 rounded-[7px] border border-[#F5B82E] bg-[#FFF2C7] px-3 text-left text-[10px] font-medium text-[#A85A00] transition hover:bg-[#FFEFB4]"
+                  onClick={() => {
+                    setEditingPortfolio(null);
+                    setPortfolioModal(true);
+                  }}
+                  className="flex h-[34px] w-full items-center gap-2 rounded-[7px] border border-[#F5B82E] bg-[#FFF2C7] px-3 text-left text-[10px] font-medium text-[#A85A00]"
                 >
                   <Plus size={12} />
                   Add portfolio links
@@ -586,7 +1065,7 @@ export default function StudentProfilePage() {
 
                 <button
                   type="button"
-                  onClick={openExperienceEditor}
+                  onClick={() => openExperienceEditor()}
                   className="flex h-[30px] items-center gap-1.5 rounded-[6px] border border-[#DCE4EE] bg-white px-2.5 text-[11px] font-medium text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
                 >
                   <Plus size={12} />
@@ -594,33 +1073,83 @@ export default function StudentProfilePage() {
                 </button>
               </div>
 
-              <div className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
-                    <Code2 size={18} strokeWidth={1.7} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-[12px] font-bold leading-5 text-[#172033] sm:text-[13px]">
-                        {experience.title}
-                      </h3>
-
-                      <span className="shrink-0 rounded-full bg-[#EEF1FF] px-2.5 py-1 text-[9px] font-semibold text-[#5146E5]">
-                        {experience.duration}
-                      </span>
-                    </div>
-
-                    <p className="mt-0.5 text-[11px] font-medium text-[#52627B] sm:text-[12px]">
-                      {experience.company}
-                    </p>
-
-                    <p className="mt-1.5 text-[10px] leading-5 text-[#71839E] sm:text-[11px]">
-                      {experience.description}
-                    </p>
-                  </div>
+              {experiences.length === 0 ? (
+                <div className="rounded-[8px] border border-dashed border-[#DCE4EE] p-5 text-center">
+                  <BriefcaseBusiness
+                    className="mx-auto mb-2 text-[#8FA0B8]"
+                    size={24}
+                  />
+                  <p className="text-[12px] font-semibold text-[#52627B]">
+                    No experience added yet
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#8FA0B8]">
+                    Add your internships, work experience or professional roles.
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {experiences.map((experience, index) => (
+                    <div
+                      className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                      key={experience._id || index}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
+                          <Code2 size={18} strokeWidth={1.7} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="text-[12px] font-bold leading-5 text-[#172033] sm:text-[13px]">
+                                {experience.title}
+                              </h3>
+
+                              <p className="mt-0.5 text-[11px] font-medium text-[#52627B] sm:text-[12px]">
+                                {experience.company}
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openExperienceEditor(experience)}
+                                className="text-[#5146E5]"
+                                aria-label="Edit experience"
+                              >
+                                <Pencil size={14} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteExperience(experience._id)
+                                }
+                                className="text-red-500"
+                                aria-label="Delete experience"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {experience.duration && (
+                            <span className="mt-2 inline-block rounded-full bg-[#EEF1FF] px-2.5 py-1 text-[9px] font-semibold text-[#5146E5]">
+                              {experience.duration}
+                            </span>
+                          )}
+
+                          {experience.description && (
+                            <p className="mt-2 text-[10px] leading-5 text-[#71839E] sm:text-[11px]">
+                              {experience.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             {/* Resume */}
@@ -644,24 +1173,29 @@ export default function StudentProfilePage() {
 
               <div className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-2.5">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#FFE4E4] text-[#EF4444]">
-                    <FileText size={18} strokeWidth={1.7} />
-                  </div>
+                  {resume && (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#FFE4E4] text-[#EF4444]">
+                      <FileText size={18} strokeWidth={1.7} />
+                    </div>
+                  )}
 
                   <div className="min-w-0">
-                    <p className="truncate text-[10px] font-bold text-[#172033] sm:text-[11px]">
-                      {resume.name}
-                    </p>
+                    {resume ? (
+                      <>
+                        <p className="truncate text-[10px] font-bold text-[#172033]">
+                          {resume.originalName}
+                        </p>
 
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="rounded-[4px] bg-[#FFE4E4] px-1.5 py-0.5 text-[8px] font-bold text-[#EF4444]">
-                        {resume.type}
-                      </span>
-
-                      <span className="text-[8px] text-[#8FA0B8] sm:text-[9px]">
-                        {resume.uploaded}
-                      </span>
-                    </div>
+                        <span className="text-[9px] text-[#8FA0B8]">
+                          Uploaded{" "}
+                          {new Date(resume.uploadedAt).toLocaleDateString()}
+                        </span>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-[#8FA0B8]">
+                        No resume uploaded yet
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -679,17 +1213,18 @@ export default function StudentProfilePage() {
                 <button
                   type="button"
                   onClick={handleUpdateResume}
-                  className="flex h-[34px] items-center justify-center gap-1.5 rounded-[7px] bg-[#5146E5] text-[10px] font-bold text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:bg-[#453BCF]"
+                  disabled={resumeUploading}
+                  className="flex h-[34px] items-center justify-center gap-1.5 rounded-[7px] bg-[#5146E5] text-[10px] font-bold text-white disabled:opacity-50"
                 >
                   <Upload size={13} />
-                  Update Resume
+                  {resumeUploading ? "Uploading..." : "Update Resume"}
                 </button>
               </div>
 
               <input
                 ref={resumeInputRef}
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept="application/pdf"
                 onChange={handleResumeSelect}
                 className="hidden"
               />
@@ -836,7 +1371,7 @@ export default function StudentProfilePage() {
               ) : (
                 <>
                   {[
-                    ["name", "Full Name"],
+                    ["fullName", "Full Name"],
                     ["email", "Email Address"],
                     ["phone", "Phone Number"],
                     ["location", "Location"],
@@ -997,335 +1532,143 @@ export default function StudentProfilePage() {
         </div>
       )}
 
-      {/* Experience Editor */}
-      {showExperienceEditor && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#172033]/40 px-3 py-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-[560px] rounded-[13px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-[18px] font-bold text-[#172033]">
-                  Experience
-                </h2>
-
-                <p className="mt-1 text-[12px] text-[#8FA0B8]">
-                  Add or update your work experience.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowExperienceEditor(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F8FAFC] text-[#64748B]"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                  Job Title
-                </span>
-
-                <input
-                  value={draftExperience.title}
-                  onChange={(event) =>
-                    setDraftExperience((current) => ({
-                      ...current,
-                      title: event.target.value,
-                    }))
-                  }
-                  className="h-11 w-full rounded-[7px] border border-[#DCE4EE] px-3 text-[13px] outline-none focus:border-[#5146E5]"
-                />
-              </label>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                    Company
-                  </span>
-
-                  <input
-                    value={draftExperience.company}
-                    onChange={(event) =>
-                      setDraftExperience((current) => ({
-                        ...current,
-                        company: event.target.value,
-                      }))
-                    }
-                    className="h-11 w-full rounded-[7px] border border-[#DCE4EE] px-3 text-[13px] outline-none focus:border-[#5146E5]"
-                  />
-                </label>
-
-                <label>
-                  <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                    Duration
-                  </span>
-
-                  <input
-                    value={draftExperience.duration}
-                    onChange={(event) =>
-                      setDraftExperience((current) => ({
-                        ...current,
-                        duration: event.target.value,
-                      }))
-                    }
-                    className="h-11 w-full rounded-[7px] border border-[#DCE4EE] px-3 text-[13px] outline-none focus:border-[#5146E5]"
-                  />
-                </label>
-              </div>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                  Description
-                </span>
-
-                <textarea
-                  rows={4}
-                  value={draftExperience.description}
-                  onChange={(event) =>
-                    setDraftExperience((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  className="w-full resize-none rounded-[7px] border border-[#DCE4EE] px-3 py-2.5 text-[13px] leading-5 outline-none focus:border-[#5146E5]"
-                />
-              </label>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowExperienceEditor(false)}
-                className="h-10 rounded-[7px] border border-[#DCE4EE] px-5 text-[12px] font-semibold text-[#64748B]"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={saveExperience}
-                className="flex h-10 items-center gap-1.5 rounded-[7px] bg-[#5146E5] px-5 text-[12px] font-semibold text-white"
-              >
-                <Save size={13} />
-                Save Experience
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Experience Modal */}
+      {experienceModal && (
+        <ProfileProjectForms
+          key={`experience-${editingExperience?._id || "new"}`}
+          mode="experience"
+          initialData={editingExperience}
+          onSave={handleSaveExperience}
+          onCancel={() => {
+            setExperienceModal(false);
+            setEditingExperience(null);
+          }}
+        />
       )}
 
-      {/* Education Editor */}
-      {showEducationEditor && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#172033]/40 px-3 py-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-[560px] rounded-[13px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-[18px] font-bold text-[#172033]">
-                  Education
-                </h2>
-
-                <p className="mt-1 text-[12px] text-[#8FA0B8]">
-                  Update your education details.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowEducationEditor(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F8FAFC] text-[#64748B]"
-              >
-                <X size={17} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                  Degree
-                </span>
-
-                <input
-                  value={draftEducation.degree}
-                  onChange={(event) =>
-                    setDraftEducation((current) => ({
-                      ...current,
-                      degree: event.target.value,
-                    }))
-                  }
-                  className="h-11 w-full rounded-[7px] border border-[#DCE4EE] px-3 text-[13px] outline-none focus:border-[#5146E5]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                  University
-                </span>
-
-                <input
-                  value={draftEducation.university}
-                  onChange={(event) =>
-                    setDraftEducation((current) => ({
-                      ...current,
-                      university: event.target.value,
-                    }))
-                  }
-                  className="h-11 w-full rounded-[7px] border border-[#DCE4EE] px-3 text-[13px] outline-none focus:border-[#5146E5]"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-[12px] font-semibold text-[#52627B]">
-                  Period
-                </span>
-
-                <input
-                  value={draftEducation.period}
-                  onChange={(event) =>
-                    setDraftEducation((current) => ({
-                      ...current,
-                      period: event.target.value,
-                    }))
-                  }
-                  className="h-11 w-full rounded-[7px] border border-[#DCE4EE] px-3 text-[13px] outline-none focus:border-[#5146E5]"
-                />
-              </label>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowEducationEditor(false)}
-                className="h-10 rounded-[7px] border border-[#DCE4EE] px-5 text-[12px] font-semibold text-[#64748B]"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={saveEducation}
-                className="flex h-10 items-center gap-1.5 rounded-[7px] bg-[#5146E5] px-5 text-[12px] font-semibold text-white"
-              >
-                <Save size={13} />
-                Save Education
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Education Modal */}
+      {educationModal && (
+        <ProfileProjectForms
+          key={`education-${editingEducation?._id || "new"}`}
+          mode="education"
+          initialData={editingEducation}
+          onSave={handleSaveEducation}
+          onCancel={() => {
+            setEducationModal(false);
+            setEditingEducation(null);
+          }}
+        />
       )}
 
-      {/* Resume Preview */}
+      {/* Resume Preview Modal */}
       {showResumePreview && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#172033]/40 px-3 py-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-[680px] rounded-[13px] bg-white p-5 shadow-2xl sm:p-6">
-            <div className="flex items-center justify-between border-b border-[#DCE4EE] pb-4">
-              <div>
-                <h2 className="text-[17px] font-bold text-[#172033]">
-                  {resume.name}
-                </h2>
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[#172033]/60 px-3 py-4 backdrop-blur-[3px]"
+          onClick={() => setShowResumePreview(false)}
+        >
+          <div
+            className="flex h-[90vh] w-full max-w-[900px] flex-col overflow-hidden rounded-[13px] bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-[#DCE4EE] px-4 py-3.5 sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FFE4E4] text-[#EF4444]">
+                  <FileText size={18} />
+                </div>
 
-                <p className="mt-1 text-[11px] text-[#8FA0B8]">
-                  Resume preview
-                </p>
+                <div className="min-w-0">
+                  <h2 className="truncate text-[14px] font-bold text-[#172033]">
+                    {resume?.originalName || "Resume"}
+                  </h2>
+
+                  <p className="mt-0.5 text-[10px] text-[#8FA0B8]">
+                    Resume preview
+                  </p>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowResumePreview(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F8FAFC] text-[#64748B]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F8FAFC] text-[#64748B] transition hover:bg-[#EEF1FF] hover:text-[#5146E5]"
               >
                 <X size={17} />
               </button>
             </div>
 
-            <div className="mt-4 rounded-[9px] border border-[#DCE4EE] bg-[#F8FAFC] p-5 sm:p-8">
-              <div className="mx-auto max-w-[520px] rounded-[6px] bg-white p-5 shadow-sm sm:p-8">
-                <div className="border-b border-[#DCE4EE] pb-4">
-                  <h1 className="text-[23px] font-bold text-[#172033]">
-                    {profile.name}
-                  </h1>
-
-                  <p className="mt-1 text-[13px] text-[#5146E5]">
-                    {profile.role}
-                  </p>
-
-                  <p className="mt-2 text-[11px] text-[#71839E]">
-                    {profile.email} · {profile.phone} · {profile.location}
-                  </p>
-                </div>
-
-                <div className="mt-5">
-                  <h3 className="text-[13px] font-bold text-[#172033]">
-                    Professional Summary
-                  </h3>
-
-                  <p className="mt-2 text-[11px] leading-5 text-[#71839E]">
-                    Aspiring full stack developer with strong foundations in
-                    React, JavaScript, Node.js and MongoDB.
-                  </p>
-                </div>
-
-                <div className="mt-5">
-                  <h3 className="text-[13px] font-bold text-[#172033]">
-                    Skills
-                  </h3>
-
-                  <p className="mt-2 text-[11px] leading-5 text-[#71839E]">
-                    {skills.join(" · ")}
-                  </p>
-                </div>
-
-                <div className="mt-5">
-                  <h3 className="text-[13px] font-bold text-[#172033]">
-                    Experience
-                  </h3>
-
-                  <p className="mt-2 text-[11px] font-semibold text-[#172033]">
-                    {experience.title}
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[#71839E]">
-                    {experience.company} · {experience.duration}
-                  </p>
-                </div>
-
-                <div className="mt-5">
-                  <h3 className="text-[13px] font-bold text-[#172033]">
-                    Education
-                  </h3>
-
-                  <p className="mt-2 text-[11px] font-semibold text-[#172033]">
-                    {education.degree}
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[#71839E]">
-                    {education.university} · {education.period}
-                  </p>
-                </div>
-              </div>
+            {/* Actual PDF Preview */}
+            <div className="min-h-0 flex-1 bg-[#F1F5F9]">
+              <iframe
+                key={resume?.publicId}
+                src="/api/profile/resume/view"
+                title="Resume PDF Preview"
+                className="h-full w-full border-0"
+                loading="eager"
+              />
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowResumePreview(false)}
-                className="h-10 rounded-[7px] border border-[#DCE4EE] px-5 text-[12px] font-semibold text-[#64748B]"
-              >
-                Close
-              </button>
+            {/* Modal Footer */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#DCE4EE] bg-white px-4 py-3 sm:px-5">
+              <p className="hidden text-[10px] text-[#8FA0B8] sm:block">
+                Uploaded{" "}
+                {resume?.uploadedAt
+                  ? new Date(resume.uploadedAt).toLocaleDateString()
+                  : ""}
+              </p>
 
-              <button
-                type="button"
-                onClick={() => notify("Resume download started")}
-                className="flex h-10 items-center gap-1.5 rounded-[7px] bg-[#5146E5] px-5 text-[12px] font-semibold text-white"
-              >
-                <Download size={13} />
-                Download
-              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResumePreview(false)}
+                  className="h-9 rounded-[7px] border border-[#DCE4EE] px-4 text-[11px] font-semibold text-[#64748B] transition hover:bg-[#F8FAFC]"
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = resumePreviewUrl;
+                    link.download = resume?.originalName || "resume.pdf";
+                    link.click();
+                  }}
+                  className="flex h-9 items-center gap-1.5 rounded-[7px] bg-[#5146E5] px-4 text-[11px] font-semibold text-white transition hover:bg-[#4338CA]"
+                >
+                  <Download size={13} />
+                  Download
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
+
+      {projectModal && (
+        <ProfileProjectForms
+          key={`project-${editingProject?._id || "new"}`}
+          mode="project"
+          initialData={editingProject}
+          onSave={handleSaveProject}
+          onCancel={() => {
+            setProjectModal(false);
+            setEditingProject(null);
+          }}
+        />
+      )}
+
+      {portfolioModal && (
+        <ProfileProjectForms
+          key={`portfolio-${editingPortfolio?._id || "new"}`}
+          mode="portfolio"
+          initialData={editingPortfolio}
+          onSave={handleSavePortfolio}
+          onCancel={() => {
+            setPortfolioModal(false);
+            setEditingPortfolio(null);
+          }}
+        />
       )}
     </main>
   );

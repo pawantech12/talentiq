@@ -18,85 +18,71 @@ import {
   MapPin,
   Sparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export default function MyJobsPage() {
   const router = useRouter();
 
-  const jobs = [
-    {
-      id: 1,
-      title: "Full Stack Developer",
-      email: "mumbai.careers@resumeai.com",
-      department: "Engineering",
-      location: "Mumbai, MH",
-      mobileLocation: "Mumbai, MH",
-      applications: 42,
-      aiMatch: 89,
-      status: "Active",
-      created: "12 Aug 2026",
-      mobileCreated: "12 Aug 2026",
-    },
-    {
-      id: 2,
-      title: "Frontend Developer",
-      email: "mumbai.careers@resumeai.com",
-      department: "Engineering",
-      location: "Mumbai / Remote",
-      mobileLocation: "Mumbai / Remote",
-      applications: 31,
-      aiMatch: 84,
-      status: "Active",
-      created: "08 Aug 2026",
-      mobileCreated: "08 Aug 2026",
-    },
-    {
-      id: 3,
-      title: "Node.js Developer",
-      email: "mumbai.careers@resumeai.com",
-      department: "Engineering",
-      location: "Mumbai, MH",
-      mobileLocation: "Mumbai, MH",
-      applications: 24,
-      aiMatch: 81,
-      status: "Active",
-      created: "05 Aug 2026",
-      mobileCreated: "05 Aug 2026",
-    },
-    {
-      id: 4,
-      title: "React Developer Intern",
-      email: "mumbai.careers@resumeai.com",
-      department: "Engineering",
-      location: "Remote",
-      mobileLocation: "Remote",
-      applications: 18,
-      aiMatch: 76,
-      status: "Closed",
-      created: "25 Jul 2026",
-      mobileCreated: "25 Jul 2026",
-    },
-    {
-      id: 5,
-      title: "Backend Developer",
-      email: "mumbai.careers@resumeai.com",
-      department: "Technology",
-      location: "Navi Mumbai",
-      mobileLocation: "Navi Mumbai",
-      applications: 11,
-      aiMatch: 79,
-      status: "Draft",
-      created: "20 Jul 2026",
-      mobileCreated: "20 Jul 2026",
-    },
-  ];
+  const [jobs, setJobs] = useState([]);
+  const [stats, setStats] = useState({
+    totalJobs: 0,
+    activeJobs: 0,
+    closedJobs: 0,
+    totalApplications: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [sortBy, setSortBy] = useState("Newest First");
   const [currentPage, setCurrentPage] = useState(1);
   const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    const loadJobs = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError("");
+        const { data } = await api.get("/recruiter/jobs");
+        if (!alive) return;
+        setJobs(data.jobs || []);
+        setStats(
+          data.stats || {
+            totalJobs: 0,
+            activeJobs: 0,
+            closedJobs: 0,
+            totalApplications: 0,
+          },
+        );
+      } catch (error) {
+        if (!alive) return;
+        if (error.response?.status === 401) router.replace("/login");
+        else
+          setLoadError(
+            error.response?.data?.message || "Unable to load your jobs.",
+          );
+      } finally {
+        if (alive) setIsLoading(false);
+      }
+    };
+    loadJobs();
+    return () => {
+      alive = false;
+    };
+  }, [router]);
+
+  const formatDate = (value) =>
+    value
+      ? new Date(value).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
 
   const showToast = (message) => {
     setToast(message);
@@ -116,9 +102,9 @@ export default function MyJobsPage() {
 
       result = result.filter(
         (job) =>
-          job.title.toLowerCase().includes(query) ||
-          job.department.toLowerCase().includes(query) ||
-          job.location.toLowerCase().includes(query),
+          (job.title || "").toLowerCase().includes(query) ||
+          (job.industry || "").toLowerCase().includes(query) ||
+          (job.location || "").toLowerCase().includes(query),
       );
     }
 
@@ -127,11 +113,11 @@ export default function MyJobsPage() {
     }
 
     if (sortBy === "Newest First") {
-      result.sort((a, b) => b.id - a.id);
+      result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
     if (sortBy === "Oldest First") {
-      result.sort((a, b) => a.id - b.id);
+      result.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     }
 
     if (sortBy === "Applications") {
@@ -143,14 +129,13 @@ export default function MyJobsPage() {
     }
 
     return result;
-  }, [search, statusFilter, sortBy]);
+  }, [jobs, search, statusFilter, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / 5));
 
-  const paginatedJobs = filteredJobs.slice(
-    (currentPage - 1) * 5,
-    currentPage * 5,
-  );
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedJobs = filteredJobs.slice((safePage - 1) * 5, safePage * 5);
 
   const handleSearch = (value) => {
     setSearch(value);
@@ -172,11 +157,11 @@ export default function MyJobsPage() {
   };
 
   const handleView = (job) => {
-    router.push(`/dashboard/recruiter/jobs/${job.id}/applicants`);
+    router.push(`/dashboard/recruiter/jobs/${job._id}/applicants`);
   };
 
   const handleEdit = (job) => {
-    router.push(`/dashboard/recruiter/jobs/${job.id}/edit`);
+    router.push(`/dashboard/recruiter/jobs/create?edit=${job._id}`);
   };
 
   const getMatchClass = (match) => {
@@ -323,7 +308,7 @@ export default function MyJobsPage() {
               />
             }
             title="Total Jobs"
-            value="12"
+            value={stats.totalJobs}
             iconClass="bg-[#f1f5f9]"
             valueClass="text-[#172033]"
           />
@@ -338,7 +323,7 @@ export default function MyJobsPage() {
               />
             }
             title="Active Jobs"
-            value="8"
+            value={stats.activeJobs}
             iconClass="bg-[#eef2ff]"
             valueClass="text-[#4f46e5]"
           />
@@ -349,7 +334,7 @@ export default function MyJobsPage() {
               <Users size={21} strokeWidth={1.8} className="text-[#7c3aed]" />
             }
             title="Total Applications"
-            value="126"
+            value={stats.totalApplications}
             iconClass="bg-[#f0eaff]"
             valueClass="text-[#7c3aed]"
           />
@@ -360,7 +345,7 @@ export default function MyJobsPage() {
               <Archive size={21} strokeWidth={1.8} className="text-[#64748b]" />
             }
             title="Closed Jobs"
-            value="4"
+            value={stats.closedJobs}
             iconClass="bg-[#f1f5f9]"
             valueClass="text-[#64748b]"
           />
@@ -378,8 +363,8 @@ export default function MyJobsPage() {
                 </h2>
 
                 <p className="mt-[2px] text-[12px] leading-[17px] text-[#64748b]">
-                  {filteredJobs.length === jobs.length
-                    ? "5 jobs found"
+                  {filteredJobs.length === 0
+                    ? "No jobs found"
                     : `${filteredJobs.length} jobs found`}
                 </p>
               </div>
@@ -453,14 +438,14 @@ export default function MyJobsPage() {
             </h2>
 
             <span className="pr-[1px] text-[12px] text-[#64748b]">
-              {filteredJobs.length} of 12 jobs
+              {filteredJobs.length} of {jobs.length} jobs
             </span>
           </div>
 
           {/* Desktop column heading */}
           <div className="hidden grid-cols-[2.55fr_1.05fr_1.3fr_0.85fr_0.85fr_0.9fr_0.9fr_0.95fr] border-b border-[#dce3ed] bg-[#f8fafc] px-[19px] py-[11px] text-[11px] font-semibold text-[#64748b] lg:grid">
             <div>Job</div>
-            <div>Department</div>
+            <div>Industry</div>
             <div>Location</div>
             <div>Applications</div>
             <div>AI Match</div>
@@ -470,305 +455,318 @@ export default function MyJobsPage() {
           </div>
 
           {/* Jobs */}
-          <div>
-            {paginatedJobs.length > 0 ? (
-              paginatedJobs.map((job) => {
-                const matchClass = getMatchClass(job.aiMatch);
+          {loadError && (
+            <div className="px-5 py-4 text-[12px] text-red-600">
+              {loadError}
+            </div>
+          )}
+          {isLoading ? (
+            <div className="px-5 py-16 text-center text-[13px] text-[#64748b]">
+              Loading your jobs...
+            </div>
+          ) : (
+            <div>
+              {paginatedJobs.length > 0 ? (
+                paginatedJobs.map((job) => {
+                  const matchClass = getMatchClass(job.aiMatch);
 
-                return (
-                  <article
-                    key={job.id}
-                    className={`border-b border-[#dce3ed] px-[19px] py-[14px] last:border-b-0 lg:grid lg:grid-cols-[2.55fr_1.05fr_1.3fr_0.85fr_0.85fr_0.9fr_0.9fr_0.95fr] lg:items-center lg:gap-0 lg:px-[19px] lg:py-[14px] ${
-                      job.status === "Closed"
-                        ? "bg-[#fffafa]"
-                        : job.status === "Draft"
-                          ? "bg-[#fffdf4]"
-                          : "bg-white"
-                    }`}
-                  >
-                    {/* Job */}
-                    <div className="flex min-w-0 items-start gap-[11px]">
-                      <div
-                        className={`flex h-[37px] w-[37px] shrink-0 items-center justify-center rounded-[9px] ${
-                          job.status === "Draft"
-                            ? "bg-[#fff1c2]"
-                            : job.status === "Closed"
-                              ? "bg-[#f1f5f9]"
-                              : "bg-[#eef2ff]"
-                        }`}
-                      >
-                        <BriefcaseBusiness
-                          size={19}
-                          strokeWidth={1.7}
-                          className={
-                            job.status === "Draft"
-                              ? "text-[#f59e0b]"
-                              : job.status === "Closed"
-                                ? "text-[#64748b]"
-                                : "text-[#4f46e5]"
-                          }
-                        />
-                      </div>
-
-                      <div className="min-w-0">
-                        <h3 className="truncate text-[14px] font-semibold leading-[19px] text-[#172033]">
-                          {job.title}
-                        </h3>
-
-                        <p className="mt-[1px] truncate text-[11px] leading-[16px] text-[#94a3b8]">
-                          {job.email}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Desktop Department */}
-                    <div className="hidden text-[13px] text-[#475569] lg:block">
-                      {job.department}
-                    </div>
-
-                    {/* Desktop Location */}
-                    <div className="hidden text-[13px] text-[#475569] lg:block">
-                      {job.location}
-                    </div>
-
-                    {/* Desktop Applications */}
-                    <div className="hidden items-center gap-[6px] text-[13px] font-semibold text-[#172033] lg:flex">
-                      <Users
-                        size={15}
-                        strokeWidth={1.7}
-                        className="text-[#64748b]"
-                      />
-                      {job.applications}
-                    </div>
-
-                    {/* Desktop AI Match */}
-                    <div
-                      className={`hidden items-center gap-[6px] text-[13px] font-semibold lg:flex ${matchClass.text}`}
+                  return (
+                    <article
+                      key={job._id}
+                      className={`border-b border-[#dce3ed] px-[19px] py-[14px] last:border-b-0 lg:grid lg:grid-cols-[2.55fr_1.05fr_1.3fr_0.85fr_0.85fr_0.9fr_0.9fr_0.95fr] lg:items-center lg:gap-0 lg:px-[19px] lg:py-[14px] ${
+                        job.status === "Closed"
+                          ? "bg-[#fffafa]"
+                          : job.status === "Draft"
+                            ? "bg-[#fffdf4]"
+                            : "bg-white"
+                      }`}
                     >
-                      <span
-                        className={`h-[7px] w-[7px] rounded-full ${matchClass.dot}`}
-                      />
-                      {job.aiMatch}%
-                    </div>
-
-                    {/* Desktop Status */}
-                    <div className="hidden lg:block">
-                      <span
-                        className={`inline-flex rounded-full px-[11px] py-[4px] text-[11px] font-semibold ${getStatusClass(
-                          job.status,
-                        )}`}
-                      >
-                        {job.status}
-                      </span>
-                    </div>
-
-                    {/* Desktop Created */}
-                    <div className="hidden text-[12px] text-[#64748b] lg:block">
-                      {job.created}
-                    </div>
-
-                    {/* Desktop actions */}
-                    <div className="hidden items-center gap-[8px] lg:flex">
-                      {job.status !== "Draft" && (
-                        <button
-                          type="button"
-                          onClick={() => handleView(job)}
-                          className="flex h-[26px] items-center justify-center rounded-[7px] bg-[#eef2ff] px-[13px] text-[11px] font-semibold text-[#4f46e5] transition hover:bg-[#e0e7ff]"
+                      {/* Job */}
+                      <div className="flex min-w-0 items-start gap-[11px]">
+                        <div
+                          className={`flex h-[37px] w-[37px] shrink-0 items-center justify-center rounded-[9px] ${
+                            job.status === "Draft"
+                              ? "bg-[#fff1c2]"
+                              : job.status === "Closed"
+                                ? "bg-[#f1f5f9]"
+                                : "bg-[#eef2ff]"
+                          }`}
                         >
-                          View
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(job)}
-                        className={`flex h-[26px] items-center justify-center rounded-[7px] px-[12px] text-[11px] font-semibold ${
-                          job.status === "Draft"
-                            ? "bg-[#eef2ff] text-[#4f46e5]"
-                            : "bg-[#f1f5f9] text-[#475569]"
-                        }`}
-                      >
-                        Edit
-                      </button>
-                    </div>
-
-                    {/* Mobile details */}
-                    <div className="mt-[12px] lg:hidden">
-                      <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[7px] text-[12px] text-[#64748b]">
-                        <span className="flex items-center gap-[5px]">
-                          <MapPin
-                            size={14}
+                          <BriefcaseBusiness
+                            size={19}
                             strokeWidth={1.7}
-                            className="text-[#64748b]"
-                          />
-                          {job.mobileLocation}
-                        </span>
-
-                        <span className="flex items-center gap-[5px]">
-                          <CalendarDays
-                            size={14}
-                            strokeWidth={1.7}
-                            className="text-[#64748b]"
-                          />
-                          {job.mobileCreated}
-                        </span>
-                      </div>
-
-                      <div className="mt-[10px] flex items-stretch">
-                        {/* Applications */}
-                        <div className="flex min-w-0 flex-1 items-center gap-[7px] border-r border-[#dce3ed] pr-[12px]">
-                          <div className="flex h-[33px] w-[33px] shrink-0 items-center justify-center rounded-[8px] bg-[#f1f5f9]">
-                            <Users
-                              size={15}
-                              strokeWidth={1.7}
-                              className="text-[#64748b]"
-                            />
-                          </div>
-
-                          <div>
-                            <p className="text-[14px] font-bold leading-[17px] text-[#172033]">
-                              {job.applications}
-                            </p>
-
-                            <p className="text-[10px] leading-[14px] text-[#64748b]">
-                              Applications
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* AI Match */}
-                        <div className="flex min-w-0 flex-1 items-center gap-[7px] border-r border-[#dce3ed] px-[12px]">
-                          <div
-                            className={`flex h-[33px] w-[33px] shrink-0 items-center justify-center rounded-[8px] ${
-                              job.aiMatch >= 84
-                                ? "bg-[#dcfce7]"
-                                : job.aiMatch >= 80
-                                  ? "bg-[#eef2ff]"
-                                  : "bg-[#fff3cf]"
-                            }`}
-                          >
-                            <Sparkles
-                              size={15}
-                              strokeWidth={1.7}
-                              className={matchClass.text}
-                            />
-                          </div>
-
-                          <div>
-                            <p
-                              className={`text-[14px] font-bold leading-[17px] ${matchClass.text}`}
-                            >
-                              {job.aiMatch}%
-                            </p>
-
-                            <p className="text-[10px] leading-[14px] text-[#64748b]">
-                              AI Match
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Status */}
-                        <div className="flex min-w-[82px] flex-1 flex-col items-end justify-center pl-[12px]">
-                          <p
-                            className={`text-[14px] font-bold leading-[17px] ${
-                              job.status === "Active"
-                                ? "text-[#16a34a]"
+                            className={
+                              job.status === "Draft"
+                                ? "text-[#f59e0b]"
                                 : job.status === "Closed"
                                   ? "text-[#64748b]"
                                   : "text-[#4f46e5]"
-                            }`}
-                          >
-                            {job.status}
-                          </p>
+                            }
+                          />
+                        </div>
 
-                          <p className="text-[10px] leading-[14px] text-[#64748b]">
-                            Status
+                        <div className="min-w-0">
+                          <h3 className="truncate text-[14px] font-semibold leading-[19px] text-[#172033]">
+                            {job.title}
+                          </h3>
+
+                          <p className="mt-[1px] truncate text-[11px] leading-[16px] text-[#94a3b8]">
+                            {job.recruiter.email || "Your recruiter account"}
                           </p>
                         </div>
                       </div>
 
-                      {/* Mobile buttons */}
-                      <div className="mt-[11px] grid grid-cols-[1fr_80px] gap-[10px]">
-                        <button
-                          type="button"
-                          onClick={() => handleView(job)}
-                          disabled={job.status === "Draft"}
-                          className={`flex h-[36px] items-center justify-center rounded-[8px] text-[13px] font-semibold ${
-                            job.status === "Draft"
-                              ? "bg-[#f1f5f9] text-[#94a3b8]"
-                              : "bg-[#eef2ff] text-[#4f46e5]"
-                          }`}
+                      {/* Desktop Industry */}
+                      <div className="hidden text-[13px] text-[#475569] lg:block">
+                        {job.industry}
+                      </div>
+
+                      {/* Desktop Location */}
+                      <div className="hidden text-[13px] text-[#475569] lg:block">
+                        {job.location}
+                      </div>
+
+                      {/* Desktop Applications */}
+                      <div className="hidden items-center gap-[6px] text-[13px] font-semibold text-[#172033] lg:flex">
+                        <Users
+                          size={15}
+                          strokeWidth={1.7}
+                          className="text-[#64748b]"
+                        />
+                        {job.applicationCount ?? 0}
+                      </div>
+
+                      {/* Desktop AI Match */}
+                      <div
+                        className={`hidden items-center gap-[6px] text-[13px] font-semibold lg:flex ${matchClass.text}`}
+                      >
+                        <span
+                          className={`h-[7px] w-[7px] rounded-full ${matchClass.dot}`}
+                        />
+                        {job.aiMatch ?? 0}%
+                      </div>
+
+                      {/* Desktop Status */}
+                      <div className="hidden lg:block">
+                        <span
+                          className={`inline-flex rounded-full px-[11px] py-[4px] text-[11px] font-semibold ${getStatusClass(
+                            job.status,
+                          )}`}
                         >
-                          View Applications
-                        </button>
+                          {job.status}
+                        </span>
+                      </div>
+
+                      {/* Desktop Created */}
+                      <div className="hidden text-[12px] text-[#64748b] lg:block">
+                        {formatDate(job.createdAt)}
+                      </div>
+
+                      {/* Desktop actions */}
+                      <div className="hidden items-center gap-[8px] lg:flex">
+                        {job.status !== "Draft" && (
+                          <button
+                            type="button"
+                            onClick={() => handleView(job)}
+                            className="flex h-[26px] items-center justify-center rounded-[7px] bg-[#eef2ff] px-[13px] text-[11px] font-semibold text-[#4f46e5] transition hover:bg-[#e0e7ff]"
+                          >
+                            View
+                          </button>
+                        )}
 
                         <button
                           type="button"
                           onClick={() => handleEdit(job)}
-                          className="flex h-[36px] items-center justify-center rounded-[8px] bg-[#f1f5f9] text-[13px] font-semibold text-[#475569]"
+                          className={`flex h-[26px] items-center justify-center rounded-[7px] px-[12px] text-[11px] font-semibold ${
+                            job.status === "Draft"
+                              ? "bg-[#eef2ff] text-[#4f46e5]"
+                              : "bg-[#f1f5f9] text-[#475569]"
+                          }`}
                         >
                           Edit
                         </button>
                       </div>
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="px-5 py-16 text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff]">
-                  <Search
-                    size={21}
-                    strokeWidth={1.7}
-                    className="text-[#4f46e5]"
-                  />
+
+                      {/* Mobile details */}
+                      <div className="mt-[12px] lg:hidden">
+                        <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[7px] text-[12px] text-[#64748b]">
+                          <span className="flex items-center gap-[5px]">
+                            <MapPin
+                              size={14}
+                              strokeWidth={1.7}
+                              className="text-[#64748b]"
+                            />
+                            {job.location}
+                          </span>
+
+                          <span className="flex items-center gap-[5px]">
+                            <CalendarDays
+                              size={14}
+                              strokeWidth={1.7}
+                              className="text-[#64748b]"
+                            />
+                            {formatDate(job.createdAt)}
+                          </span>
+                        </div>
+
+                        <div className="mt-[10px] flex items-stretch">
+                          {/* Applications */}
+                          <div className="flex min-w-0 flex-1 items-center gap-[7px] border-r border-[#dce3ed] pr-[12px]">
+                            <div className="flex h-[33px] w-[33px] shrink-0 items-center justify-center rounded-[8px] bg-[#f1f5f9]">
+                              <Users
+                                size={15}
+                                strokeWidth={1.7}
+                                className="text-[#64748b]"
+                              />
+                            </div>
+
+                            <div>
+                              <p className="text-[14px] font-bold leading-[17px] text-[#172033]">
+                                {job.applicationCount ?? 0}
+                              </p>
+
+                              <p className="text-[10px] leading-[14px] text-[#64748b]">
+                                Applications
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* AI Match */}
+                          <div className="flex min-w-0 flex-1 items-center gap-[7px] border-r border-[#dce3ed] px-[12px]">
+                            <div
+                              className={`flex h-[33px] w-[33px] shrink-0 items-center justify-center rounded-[8px] ${
+                                job.aiMatch >= 84
+                                  ? "bg-[#dcfce7]"
+                                  : job.aiMatch >= 80
+                                    ? "bg-[#eef2ff]"
+                                    : "bg-[#fff3cf]"
+                              }`}
+                            >
+                              <Sparkles
+                                size={15}
+                                strokeWidth={1.7}
+                                className={matchClass.text}
+                              />
+                            </div>
+
+                            <div>
+                              <p
+                                className={`text-[14px] font-bold leading-[17px] ${matchClass.text}`}
+                              >
+                                {job.aiMatch ?? 0}%
+                              </p>
+
+                              <p className="text-[10px] leading-[14px] text-[#64748b]">
+                                AI Match
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex min-w-[82px] flex-1 flex-col items-end justify-center pl-[12px]">
+                            <p
+                              className={`text-[14px] font-bold leading-[17px] ${
+                                job.status === "Active"
+                                  ? "text-[#16a34a]"
+                                  : job.status === "Closed"
+                                    ? "text-[#64748b]"
+                                    : "text-[#4f46e5]"
+                              }`}
+                            >
+                              {job.status}
+                            </p>
+
+                            <p className="text-[10px] leading-[14px] text-[#64748b]">
+                              Status
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Mobile buttons */}
+                        <div className="mt-[11px] grid grid-cols-[1fr_80px] gap-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => handleView(job)}
+                            disabled={job.status === "Draft"}
+                            className={`flex h-[36px] items-center justify-center rounded-[8px] text-[13px] font-semibold ${
+                              job.status === "Draft"
+                                ? "bg-[#f1f5f9] text-[#94a3b8]"
+                                : "bg-[#eef2ff] text-[#4f46e5]"
+                            }`}
+                          >
+                            View Applications
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(job)}
+                            className="flex h-[36px] items-center justify-center rounded-[8px] bg-[#f1f5f9] text-[13px] font-semibold text-[#475569]"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="px-5 py-16 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff]">
+                    <Search
+                      size={21}
+                      strokeWidth={1.7}
+                      className="text-[#4f46e5]"
+                    />
+                  </div>
+
+                  <h3 className="mt-3 text-[15px] font-semibold text-[#172033]">
+                    No jobs found
+                  </h3>
+
+                  <p className="mt-1 text-[12px] text-[#64748b]">
+                    Try changing your search or filters.
+                  </p>
                 </div>
-
-                <h3 className="mt-3 text-[15px] font-semibold text-[#172033]">
-                  No jobs found
-                </h3>
-
-                <p className="mt-1 text-[12px] text-[#64748b]">
-                  Try changing your search or filters.
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Pagination */}
           <div className="flex items-center justify-between border-t border-[#dce3ed] px-[19px] py-[12px]">
             <p className="text-[12px] text-[#64748b]">
-              Showing {paginatedJobs.length} of {jobs.length} jobs
+              Showing {paginatedJobs.length} of {filteredJobs.length} jobs
             </p>
 
             <div className="flex items-center gap-[5px]">
               <button
                 type="button"
-                disabled={currentPage === 1}
+                disabled={safePage === 1}
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                 className="flex h-[28px] w-[38px] items-center justify-center rounded-[7px] border border-[#dce3ed] bg-white text-[#64748b] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ChevronLeft size={15} strokeWidth={1.7} />
               </button>
 
-              {[1, 2, 3].map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  onClick={() => setCurrentPage(page)}
-                  className={`flex h-[28px] w-[33px] items-center justify-center rounded-[7px] border text-[12px] font-medium ${
-                    currentPage === page
-                      ? "border-[#4f46e5] bg-[#4f46e5] text-white"
-                      : "border-[#dce3ed] bg-white text-[#475569]"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+                (page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`flex h-[28px] w-[33px] items-center justify-center rounded-[7px] border text-[12px] font-medium ${
+                      safePage === page
+                        ? "border-[#4f46e5] bg-[#4f46e5] text-white"
+                        : "border-[#dce3ed] bg-white text-[#475569]"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ),
+              )}
 
               <button
                 type="button"
-                disabled={currentPage >= totalPages}
+                disabled={safePage >= totalPages}
                 onClick={() =>
                   setCurrentPage((page) => Math.min(totalPages, page + 1))
                 }

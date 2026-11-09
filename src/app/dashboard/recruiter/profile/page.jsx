@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   UserRound,
   Building2,
@@ -20,24 +20,35 @@ import {
   Check,
   ChevronDown,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import api from "@/lib/api";
 
 export default function RecruiterProfilePage() {
-  const [profile, setProfile] = useState({
-    fullName: "Anita Mehta",
-    email: "anita.mehta@example.com",
-    phone: "+91 98765 43210",
-    location: "Mumbai, Maharashtra",
-    jobTitle: "Recruitment Manager",
-    company: "TechNova Solutions",
-    department: "Human Resources",
-    experience: "5 Years",
-  });
+  const router = useRouter();
+
+  const emptyProfile = {
+    fullName: "",
+    email: "",
+    phone: "",
+    location: "",
+    jobTitle: "",
+    company: "",
+    department: "",
+    experience: "",
+    createdAt: null,
+    emailVerified: false,
+    accountStatus: "active",
+  };
+
+  const [profile, setProfile] = useState(emptyProfile);
+  const [editForm, setEditForm] = useState(emptyProfile);
+
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState("");
 
   const [editProfile, setEditProfile] = useState(false);
   const [changePassword, setChangePassword] = useState(false);
   const [logoutModal, setLogoutModal] = useState(false);
-
-  const [editForm, setEditForm] = useState(profile);
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -54,6 +65,60 @@ export default function RecruiterProfilePage() {
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadRecruiterProfile() {
+      try {
+        setIsLoadingProfile(true);
+        setProfileError("");
+
+        const { data } = await api.get("/profile");
+
+        if (!data.success) {
+          throw new Error(data.message || "Unable to load profile.");
+        }
+
+        const loadedProfile = {
+          ...emptyProfile,
+          ...data.profile,
+
+          // API/database uses companyName.
+          // The existing JSX uses company.
+          company: data.profile.companyName || "",
+        };
+
+        if (mounted) {
+          setProfile(loadedProfile);
+          setEditForm(loadedProfile);
+        }
+      } catch (error) {
+        if (mounted) {
+          const message =
+            error.response?.data?.message ||
+            error.message ||
+            "Unable to load recruiter profile.";
+
+          setProfileError(message);
+        }
+
+        if (error.response?.status === 401) {
+          router.replace("/login");
+        }
+      } finally {
+        if (mounted) {
+          setIsLoadingProfile(false);
+        }
+      }
+    }
+
+    loadRecruiterProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   const handleOpenEdit = () => {
     setEditForm(profile);
@@ -75,46 +140,71 @@ export default function RecruiterProfilePage() {
     }));
   };
 
-  const handleSaveProfile = (event) => {
+  const handleSaveProfile = async (event) => {
     event.preventDefault();
 
-    if (
-      !editForm.fullName.trim() ||
-      !editForm.email.trim() ||
-      !editForm.phone.trim() ||
-      !editForm.location.trim() ||
-      !editForm.jobTitle.trim() ||
-      !editForm.company.trim() ||
-      !editForm.department.trim() ||
-      !editForm.experience.trim()
-    ) {
+    const requiredFields = [
+      "fullName",
+      "phone",
+      "location",
+      "jobTitle",
+      "company",
+      "department",
+      "experience",
+    ];
+
+    const hasEmptyField = requiredFields.some(
+      (field) => typeof editForm[field] !== "string" || !editForm[field].trim(),
+    );
+
+    if (hasEmptyField) {
+      setProfileError("Please complete all required profile fields.");
       return;
     }
 
-    setIsSavingProfile(true);
+    try {
+      setIsSavingProfile(true);
+      setProfileError("");
 
-    setTimeout(() => {
-      setProfile({
-        ...editForm,
+      const payload = {
         fullName: editForm.fullName.trim(),
-        email: editForm.email.trim(),
         phone: editForm.phone.trim(),
         location: editForm.location.trim(),
         jobTitle: editForm.jobTitle.trim(),
-        company: editForm.company.trim(),
+        companyName: editForm.company.trim(),
         department: editForm.department.trim(),
         experience: editForm.experience.trim(),
-      });
+      };
 
-      setIsSavingProfile(false);
+      const { data } = await api.patch("/profile", payload);
+
+      if (!data.success) {
+        throw new Error(data.message || "Unable to update profile.");
+      }
+
+      const updatedProfile = {
+        ...emptyProfile,
+        ...data.profile,
+        company: data.profile.companyName || "",
+      };
+
+      setProfile(updatedProfile);
+      setEditForm(updatedProfile);
       setEditProfile(false);
-
       setSuccessMessage("Profile updated successfully.");
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 600);
+    } catch (error) {
+      setProfileError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to update profile.",
+      );
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleOpenPassword = () => {
@@ -150,16 +240,20 @@ export default function RecruiterProfilePage() {
     setPasswordError("");
   };
 
-  const handleChangePassword = (event) => {
+  const handleChangePassword = async (event) => {
     event.preventDefault();
+    setPasswordError("");
 
     if (!passwordForm.currentPassword) {
       setPasswordError("Please enter your current password.");
       return;
     }
 
-    if (passwordForm.newPassword.length < 8) {
-      setPasswordError("New password must contain at least 8 characters.");
+    if (
+      passwordForm.newPassword.length < 8 ||
+      passwordForm.newPassword.length > 72
+    ) {
+      setPasswordError("New password must contain 8 to 72 characters.");
       return;
     }
 
@@ -168,10 +262,18 @@ export default function RecruiterProfilePage() {
       return;
     }
 
-    setIsChangingPassword(true);
+    try {
+      setIsChangingPassword(true);
 
-    setTimeout(() => {
-      setIsChangingPassword(false);
+      const { data } = await api.post("/auth/change-password", {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+
+      if (!data.success) {
+        throw new Error(data.message || "Unable to change password.");
+      }
+
       setChangePassword(false);
 
       setPasswordForm({
@@ -180,24 +282,39 @@ export default function RecruiterProfilePage() {
         confirmPassword: "",
       });
 
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+
       setSuccessMessage("Password changed successfully.");
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setSuccessMessage("");
       }, 3000);
-    }, 700);
+    } catch (error) {
+      setPasswordError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to change password.",
+      );
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
-  const handleLogout = () => {
-    setLogoutModal(false);
-
-    setSuccessMessage("You have been logged out.");
-
-    setTimeout(() => {
-      setSuccessMessage("");
-    }, 3000);
-
-    // Connect your real logout API/authentication here.
+  const handleLogout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error.response?.data?.message || error.message,
+      );
+    } finally {
+      setLogoutModal(false);
+      router.replace("/login");
+      router.refresh();
+    }
   };
 
   return (
@@ -237,7 +354,12 @@ export default function RecruiterProfilePage() {
             <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:text-left">
               {/* Avatar */}
               <div className="flex h-[68px] w-[68px] shrink-0 items-center justify-center rounded-full bg-[#4f46e5] text-[24px] font-semibold text-white sm:h-[72px] sm:w-[72px] sm:text-[25px]">
-                AM
+                {profile.fullName
+                  ?.trim()
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase())
+                  .join("") || "R"}
               </div>
 
               <div className="mt-3 sm:ml-5 sm:mt-0">
@@ -456,9 +578,23 @@ export default function RecruiterProfilePage() {
                     Account Status
                   </span>
 
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-3 py-1 text-[11px] font-semibold text-[#16a34a]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
-                    Active
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold ${
+                      profile.accountStatus === "disabled"
+                        ? "bg-[#fef2f2] text-[#dc2626]"
+                        : "bg-[#dcfce7] text-[#16a34a]"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        profile.accountStatus === "disabled"
+                          ? "bg-[#dc2626]"
+                          : "bg-[#16a34a]"
+                      }`}
+                    />
+                    {profile.accountStatus === "disabled"
+                      ? "Disabled"
+                      : "Active"}
                   </span>
                 </div>
 
@@ -468,7 +604,15 @@ export default function RecruiterProfilePage() {
                   </span>
 
                   <span className="text-right text-[12px] font-semibold text-[#111827] sm:text-[13px]">
-                    January 2026
+                    {profile.createdAt
+                      ? new Date(profile.createdAt).toLocaleDateString(
+                          "en-IN",
+                          {
+                            month: "long",
+                            year: "numeric",
+                          },
+                        )
+                      : "—"}
                   </span>
                 </div>
 
@@ -477,9 +621,21 @@ export default function RecruiterProfilePage() {
                     Email Verification
                   </span>
 
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-3 py-1 text-[11px] font-semibold text-[#16a34a]">
-                    <Check className="h-3 w-3" />
-                    Verified
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold ${
+                      profile.emailVerified
+                        ? "bg-[#dcfce7] text-[#16a34a]"
+                        : "bg-[#fef3c7] text-[#b45309]"
+                    }`}
+                  >
+                    {profile.emailVerified ? (
+                      <>
+                        <Check className="h-3 w-3" />
+                        Verified
+                      </>
+                    ) : (
+                      "Not verified"
+                    )}
                   </span>
                 </div>
               </div>
@@ -642,11 +798,8 @@ export default function RecruiterProfilePage() {
                       <input
                         type="email"
                         value={editForm.email}
-                        onChange={(event) =>
-                          handleEditChange("email", event.target.value)
-                        }
+                        readOnly
                         className="h-10 w-full rounded-lg border border-[#dbe3ee] bg-white pl-9 pr-3 text-[13px] text-[#111827] outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10"
-                        placeholder="name@example.com"
                       />
                     </div>
                   </div>
