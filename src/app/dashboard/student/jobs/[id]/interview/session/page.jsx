@@ -4,190 +4,127 @@ import {
   ArrowLeft,
   ArrowRight,
   BriefcaseBusiness,
-  Check,
-  CheckCircle2,
-  ChevronRight,
   Clock3,
   Code2,
   Info,
   Layers3,
   LockKeyhole,
   MessageSquare,
-  Play,
   Sparkles,
-  Timer,
   X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+const API_BASE = "/api/student/jobs";
+
+const EVALUATION_AREAS = [
+  {
+    title: "Technical Knowledge",
+    icon: Code2,
+    iconBg: "bg-indigo-50",
+    iconColor: "text-[#5146e5]",
+  },
+  {
+    title: "Problem Solving",
+    icon: Sparkles,
+    iconBg: "bg-violet-50",
+    iconColor: "text-[#7c3aed]",
+  },
+  {
+    title: "Communication",
+    icon: MessageSquare,
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-500",
+  },
+  {
+    title: "Role Understanding",
+    icon: BriefcaseBusiness,
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-500",
+  },
+];
+
+async function apiRequest(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: "include",
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...options.headers,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.success === false) {
+    throw new Error(data.message || "Something went wrong.");
+  }
+
+  return data;
+}
+
+function formatDuration(seconds) {
+  const minutes = Math.floor((seconds || 0) / 60);
+  const remainingSeconds = (seconds || 0) % 60;
+
+  if (remainingSeconds === 0) {
+    return `${minutes} min`;
+  }
+
+  return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
+}
 
 export default function AIMockInterviewActivePage() {
   const router = useRouter();
+  const params = useParams();
 
-  /*
-   * Interview data
-   */
-  const interview = {
-    job: "Full Stack Developer",
-    company: "ABC Technologies",
-    location: "Mumbai",
-    questions: 8,
-    duration: "10–15 min",
+  const jobId = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-    skills: ["React", "JavaScript", "Node.js", "MongoDB"],
+  const [job, setJob] = useState(null);
+  const [interview, setInterview] = useState(null);
 
-    evaluationAreas: [
-      {
-        title: "Technical Knowledge",
-        icon: Code2,
-        iconBg: "bg-indigo-50",
-        iconColor: "text-[#5146e5]",
-      },
-      {
-        title: "Problem Solving",
-        icon: Sparkles,
-        iconBg: "bg-violet-50",
-        iconColor: "text-[#7c3aed]",
-      },
-      {
-        title: "Communication",
-        icon: MessageSquare,
-        iconBg: "bg-emerald-50",
-        iconColor: "text-emerald-500",
-      },
-      {
-        title: "Role Understanding",
-        icon: BriefcaseBusiness,
-        iconBg: "bg-amber-50",
-        iconColor: "text-amber-500",
-      },
-    ],
+  // Answers are stored using the question ID returned by the backend.
+  const [answers, setAnswers] = useState({});
 
-    questionsData: [
-      {
-        id: 1,
-        category: "Technical",
-        question:
-          "Tell me about yourself and your experience with full-stack development.",
-        tip: "Briefly explain your background, experience and the technologies you have worked with.",
-        skill: "React",
-      },
-      {
-        id: 2,
-        category: "Technical",
-        question:
-          "How would you design a scalable frontend architecture for a large React application?",
-        tip: "Explain how you would structure components, state management and reusable modules.",
-        skill: "React",
-      },
-      {
-        id: 3,
-        category: "Technical",
-        question:
-          "How would you design a scalable REST API using Node.js and Express?",
-        tip: "Explain your approach, key technologies and why you would choose them.",
-        skill: "Node.js",
-      },
-      {
-        id: 4,
-        category: "Problem Solving",
-        question:
-          "How would you troubleshoot a slow API response in a production application?",
-        tip: "Walk through your debugging process and explain how you would identify the bottleneck.",
-        skill: "Node.js",
-      },
-      {
-        id: 5,
-        category: "Technical",
-        question:
-          "How would you optimize a MongoDB database for an application with millions of records?",
-        tip: "Discuss indexing, query optimization, schema design and monitoring.",
-        skill: "MongoDB",
-      },
-      {
-        id: 6,
-        category: "Communication",
-        question:
-          "Describe a difficult technical problem you faced and how you communicated the solution.",
-        tip: "Focus on the situation, your approach, communication and final outcome.",
-        skill: "JavaScript",
-      },
-      {
-        id: 7,
-        category: "Problem Solving",
-        question:
-          "How would you handle a sudden increase in traffic to your application?",
-        tip: "Discuss scalability, caching, load balancing and monitoring.",
-        skill: "Node.js",
-      },
-      {
-        id: 8,
-        category: "Role Understanding",
-        question:
-          "What would be your priorities during your first month in this role?",
-        tip: "Explain how you would understand the product, team, codebase and business requirements.",
-        skill: "React",
-      },
-    ],
-  };
-
-  /*
-   * Current question.
-   *
-   * Starts at Question 3 to match the supplied design.
-   */
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
 
-  /*
-   * Answers are stored per question so moving back and forth
-   * does not lose previously entered answers.
-   */
-  const [answers, setAnswers] = useState(Array(interview.questions).fill(""));
-
-  /*
-   * First two questions are already answered in the supplied
-   * active-interview screenshot.
-   */
-  const [answeredQuestions, setAnsweredQuestions] = useState(new Set([0, 0]));
-
-  /*
-   * Screenshot starts at 08:42.
-   * 8 minutes 42 seconds = 522 seconds.
-   */
-  const [remainingSeconds, setRemainingSeconds] = useState(522);
-
-  const [isExiting, setIsExiting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [error, setError] = useState("");
 
-  const question = interview.questionsData[currentQuestion];
+  const submissionStartedRef = useRef(false);
 
-  const answer = answers[currentQuestion] || "";
+  const questions = interview?.questions || [];
 
-  /*
-   * Countdown timer
-   */
-  useEffect(() => {
-    if (remainingSeconds <= 0) {
-      return;
-    }
+  const question = questions[currentQuestion];
 
-    const interval = window.setInterval(() => {
-      setRemainingSeconds((previous) => {
-        if (previous <= 1) {
-          window.clearInterval(interval);
-          return 0;
-        }
+  const answer = question ? answers[question.id] || "" : "";
 
-        return previous - 1;
-      });
-    }, 1000);
+  const totalQuestions = questions.length;
 
-    return () => window.clearInterval(interval);
-  }, [remainingSeconds]);
+  const answeredQuestions = useMemo(() => {
+    return new Set(
+      questions
+        .filter((item) => String(answers[item.id] || "").trim().length > 0)
+        .map((item) => item.id),
+    );
+  }, [answers, questions]);
 
-  /*
-   * Format timer as MM:SS
-   */
+  const answeredCount = answeredQuestions.size;
+
+  const remainingQuestions = Math.max(totalQuestions - answeredCount, 0);
+
+  const questionNumber = currentQuestion + 1;
+
+  const completionPercentage = totalQuestions
+    ? Math.round((questionNumber / totalQuestions) * 100)
+    : 0;
+
+  const progressWidth = `${Math.min(completionPercentage, 100)}%`;
+
   const formattedTime = useMemo(() => {
     const minutes = Math.floor(remainingSeconds / 60);
     const seconds = remainingSeconds % 60;
@@ -198,98 +135,256 @@ export default function AIMockInterviewActivePage() {
     )}`;
   }, [remainingSeconds]);
 
-  /*
-   * Current progress
-   */
-  const questionNumber = currentQuestion + 1;
+  const durationLabel = interview?.durationSeconds
+    ? formatDuration(interview.durationSeconds)
+    : "10 min";
 
-  const completionPercentage = Math.round(
-    (questionNumber / interview.questions) * 100,
+  /*
+   * Load interview from the backend.
+   *
+   * The backend creates the interview if one does not exist.
+   * Refreshing the page loads the existing interview instead.
+   */
+  useEffect(() => {
+    if (!jobId) return;
+
+    let cancelled = false;
+
+    async function loadInterview() {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const data = await apiRequest(`${API_BASE}/${jobId}/interview`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (cancelled) return;
+
+        const loadedInterview = data.interview;
+
+        if (!loadedInterview) {
+          throw new Error("Interview data was not returned by the server.");
+        }
+
+        setJob(data.job || null);
+        setInterview(loadedInterview);
+        setAnswers(loadedInterview.answers || {});
+
+        // The server controls the actual deadline.
+        if (loadedInterview.expiresAt) {
+          const deadline = new Date(loadedInterview.expiresAt).getTime();
+
+          const secondsLeft = Math.max(
+            0,
+            Math.ceil((deadline - Date.now()) / 1000),
+          );
+
+          setRemainingSeconds(secondsLeft);
+        }
+
+        // A completed or expired attempt should show its saved result.
+        if (
+          loadedInterview.status === "submitted" ||
+          loadedInterview.status === "expired"
+        ) {
+          router.replace(`/dashboard/student/jobs/${jobId}/interview/result`);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Unable to load your interview.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadInterview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, router]);
+
+  /*
+   * Save answers to MongoDB.
+   */
+  const saveAnswers = useCallback(
+    async (answersToSave) => {
+      if (!jobId || !interview?.id) return;
+
+      if (interview.status !== "in_progress") return;
+
+      return apiRequest(`${API_BASE}/${jobId}/interview`, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "save",
+          answers: answersToSave,
+        }),
+      });
+    },
+    [jobId, interview?.id, interview?.status],
   );
 
-  const answeredCount = answeredQuestions.size;
+  /*
+   * Automatically save answers after the user stops typing.
+   *
+   * This protects answers if the user refreshes or leaves the page.
+   */
+  useEffect(() => {
+    if (
+      isLoading ||
+      isSubmitting ||
+      !interview?.id ||
+      interview.status !== "in_progress"
+    ) {
+      return;
+    }
 
-  const remainingQuestions = Math.max(interview.questions - answeredCount, 0);
+    const timeout = window.setTimeout(async () => {
+      try {
+        await saveAnswers(answers);
+      } catch (err) {
+        console.error("Unable to autosave interview answers:", err);
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    answers,
+    interview?.id,
+    interview?.status,
+    isLoading,
+    isSubmitting,
+    saveAnswers,
+  ]);
 
   /*
-   * Save current answer
+   * Submit the interview.
+   *
+   * The backend evaluates answers using Groq and stores the result.
+   * The browser never calculates or invents an interview score.
+   */
+  const submitInterview = useCallback(
+    async (finalAnswers = answers) => {
+      if (!jobId || !interview?.id) return;
+
+      if (submissionStartedRef.current) return;
+
+      submissionStartedRef.current = true;
+      setIsSubmitting(true);
+      setError("");
+
+      try {
+        const data = await apiRequest(`${API_BASE}/${jobId}/interview`, {
+          method: "POST",
+          body: JSON.stringify({
+            action: "submit",
+            answers: finalAnswers,
+          }),
+        });
+
+        if (!data.result) {
+          throw new Error(
+            "The interview was submitted, but no result was returned.",
+          );
+        }
+
+        setInterview(data.interview || interview);
+
+        router.replace(`/dashboard/student/jobs/${jobId}/interview/result`);
+      } catch (err) {
+        submissionStartedRef.current = false;
+        setIsSubmitting(false);
+        setError(
+          err.message || "Unable to submit your interview. Please try again.",
+        );
+      }
+    },
+    [answers, interview, jobId, router],
+  );
+
+  /*
+   * Server-authoritative countdown.
+   *
+   * It uses expiresAt rather than decrementing a timer from its
+   * initial value, so refreshing does not restart the interview.
+   */
+  useEffect(() => {
+    if (
+      isLoading ||
+      !interview?.expiresAt ||
+      interview.status !== "in_progress"
+    ) {
+      return;
+    }
+
+    const deadline = new Date(interview.expiresAt).getTime();
+
+    const updateTimer = () => {
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((deadline - Date.now()) / 1000),
+      );
+
+      setRemainingSeconds(secondsLeft);
+
+      if (secondsLeft <= 0) {
+        submitInterview(answers);
+      }
+    };
+
+    updateTimer();
+
+    const interval = window.setInterval(updateTimer, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [
+    answers,
+    interview?.expiresAt,
+    interview?.status,
+    isLoading,
+    submitInterview,
+  ]);
+
+  /*
+   * Save current answer locally.
    */
   const handleAnswerChange = (event) => {
     const value = event.target.value;
 
-    if (value.length > 1000) {
+    if (!question || value.length > 3000) {
       return;
     }
 
-    setAnswers((previous) => {
-      const next = [...previous];
-      next[currentQuestion] = value;
-      return next;
-    });
+    setAnswers((previous) => ({
+      ...previous,
+      [question.id]: value,
+    }));
   };
 
   /*
-   * Move to next question.
+   * Move to the next question.
    */
   const handleNext = () => {
-    if (isSubmitting) return;
+    if (isSubmitting || !question) return;
 
     const trimmedAnswer = answer.trim();
 
-    /*
-     * Do not allow empty answer to be submitted.
-     */
-    if (!trimmedAnswer) {
-      return;
-    }
+    if (!trimmedAnswer) return;
 
-    const updatedAnswered = new Set(answeredQuestions);
-    updatedAnswered.add(currentQuestion);
+    const updatedAnswers = {
+      ...answers,
+      [question.id]: trimmedAnswer,
+    };
 
-    setAnsweredQuestions(updatedAnswered);
+    setAnswers(updatedAnswers);
 
-    /*
-     * Last question -> assessment result
-     */
-    if (currentQuestion === interview.questions - 1) {
-      setIsSubmitting(true);
-
-      try {
-        sessionStorage.setItem(
-          "resumeai-assessment-result",
-          JSON.stringify({
-            totalQuestions: interview.questions,
-            correctAnswers: 8,
-            timeTaken: 11 * 60,
-            resumeMatch: 86,
-            skills: [
-              {
-                name: "React",
-                score: 90,
-              },
-              {
-                name: "JavaScript",
-                score: 85,
-              },
-              {
-                name: "Node.js",
-                score: 80,
-              },
-              {
-                name: "MongoDB",
-                score: 75,
-              },
-            ],
-          }),
-        );
-      } catch (error) {
-        console.error("Unable to save assessment result:", error);
-      }
-
-      window.setTimeout(() => {
-        router.push("/dashboard/student/interview/result");
-      }, 350);
-
+    if (currentQuestion === totalQuestions - 1) {
+      submitInterview(updatedAnswers);
       return;
     }
 
@@ -297,74 +392,142 @@ export default function AIMockInterviewActivePage() {
   };
 
   /*
-   * Previous question
+   * Previous question.
    */
   const handlePrevious = () => {
-    if (currentQuestion === 0 || isSubmitting) {
-      return;
-    }
+    if (currentQuestion === 0 || isSubmitting) return;
 
     setCurrentQuestion((previous) => previous - 1);
   };
 
   /*
-   * Clicking a progress question
+   * Navigate to an available question.
    */
   const handleQuestionJump = (index) => {
     if (isSubmitting) return;
 
-    /*
-     * Only allow jumping to already answered questions,
-     * current question, or the next available question.
-     */
-    const canOpen = index <= currentQuestion || answeredQuestions.has(index);
+    const targetQuestion = questions[index];
 
-    if (!canOpen) {
-      return;
-    }
+    if (!targetQuestion) return;
+
+    const isAnswered = answeredQuestions.has(targetQuestion.id);
+
+    const canOpen = index <= currentQuestion || isAnswered;
+
+    if (!canOpen) return;
 
     setCurrentQuestion(index);
   };
 
   /*
-   * Exit interview
+   * Exit interview.
+   *
+   * The current answers are saved before leaving.
+   * The backend keeps the same attempt and deadline.
    */
-  const handleExit = () => {
-    if (isExiting) return;
+  const handleExit = async () => {
+    if (isExiting || isSubmitting) return;
 
     const confirmed = window.confirm(
-      "Are you sure you want to exit the interview? Your current progress may not be saved.",
+      "Are you sure you want to exit the interview? Your saved progress will be available when you return, but the timer will continue.",
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     setIsExiting(true);
 
-    window.setTimeout(() => {
-      router.push("/dashboard/student/interview");
-    }, 250);
+    try {
+      await saveAnswers(answers);
+
+      router.push(`/dashboard/student/jobs/${jobId}/interview`);
+    } catch (err) {
+      setError(err.message || "Unable to save your progress before exiting.");
+      setIsExiting(false);
+    }
   };
 
   /*
-   * Top progress status
+   * Loading state.
    */
-  const progressWidth = `${Math.min(completionPercentage, 100)}%`;
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4">
+        <div className="w-full max-w-sm rounded-[12px] border border-[#dce4ef] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50">
+            <Sparkles size={22} className="animate-pulse text-[#5146e5]" />
+          </div>
+
+          <h2 className="mt-4 text-[15px] font-bold text-[#172033]">
+            Preparing your AI interview
+          </h2>
+
+          <p className="mt-2 text-[12px] leading-5 text-[#71829a]">
+            Generating your job-specific questions. This may take a few moments.
+          </p>
+
+          <div className="mx-auto mt-5 h-1.5 w-32 overflow-hidden rounded-full bg-indigo-50">
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-[#5146e5]" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * Error / unavailable state.
+   */
+  if (!interview || !questions.length) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4">
+        <div className="w-full max-w-md rounded-[12px] border border-[#dce4ef] bg-white p-6 text-center shadow-sm">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-500">
+            <Info size={20} />
+          </div>
+
+          <h2 className="mt-4 text-[16px] font-bold text-[#172033]">
+            Unable to load interview
+          </h2>
+
+          <p className="mt-2 text-[12px] leading-5 text-[#71829a]">
+            {error ||
+              "We could not find an active interview session for this job."}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/student/jobs")}
+            className="mt-5 rounded-[8px] bg-[#5146e5] px-5 py-2.5 text-[12px] font-semibold text-white transition hover:bg-[#453bcf]"
+          >
+            Back to Jobs
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  const isLastQuestion = currentQuestion === totalQuestions - 1;
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#172033]">
-      {/* =========================================================
-          MAIN CONTENT
-         ========================================================= */}
       <div className="mx-auto w-full px-3 py-3 sm:px-5 sm:py-5 lg:px-8 lg:py-7">
-        {/* =======================================================
-            DESKTOP 2 COLUMN / MOBILE 1 COLUMN
-           ======================================================= */}
+        {/* Error notification */}
+        {error && (
+          <div className="mb-4 flex items-start justify-between gap-3 rounded-[9px] border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-600">
+            <p>{error}</p>
+
+            <button
+              type="button"
+              onClick={() => setError("")}
+              aria-label="Dismiss error"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
+
+        {/* Main two-column layout */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.02fr_0.98fr] lg:items-start lg:gap-6">
-          {/* =====================================================
-              LEFT / MAIN QUESTION
-             ===================================================== */}
+          {/* LEFT: MAIN QUESTION */}
           <section className="rounded-[12px] border border-[#dce4ef] bg-white p-4 shadow-[0_2px_7px_rgba(15,23,42,0.04)] sm:p-5 lg:p-7">
             {/* Question header */}
             <div className="flex items-center justify-between gap-3 border-b border-[#e5eaf1] pb-4">
@@ -430,9 +593,8 @@ export default function AIMockInterviewActivePage() {
               </div>
 
               <p className="mt-3 text-[11px] leading-5 text-[#4f5f78] sm:text-[12px] sm:leading-5 lg:text-[13px]">
-                {currentQuestion === 2
-                  ? "Explain your approach clearly and mention the technologies you would use. Include how you would structure your API endpoints and handle middleware."
-                  : question.tip}
+                {question.tip ||
+                  "Explain your approach clearly and include a practical example."}
               </p>
             </div>
 
@@ -453,7 +615,7 @@ export default function AIMockInterviewActivePage() {
                       : "text-[#8fa0b7]"
                   }`}
                 >
-                  {answer.length} / 1000
+                  {answer.length} / 3000
                   <span className="hidden sm:inline"> characters</span>
                 </span>
               </div>
@@ -462,15 +624,20 @@ export default function AIMockInterviewActivePage() {
                 id="answer"
                 value={answer}
                 onChange={handleAnswerChange}
-                maxLength={1000}
+                maxLength={3000}
+                disabled={isSubmitting || remainingSeconds <= 0}
                 placeholder="Type your answer here..."
-                className="min-h-[228px] w-full resize-none rounded-[10px] border border-[#5146e5] bg-white px-3.5 py-3.5 text-[13px] leading-5 text-[#172033] outline-none ring-0 placeholder:text-[#9aabc1] focus:border-[#5146e5] focus:ring-2 focus:ring-[#5146e5]/10 sm:min-h-[250px] sm:text-[14px] lg:min-h-[252px]"
+                className="min-h-[228px] w-full resize-none rounded-[10px] border border-[#5146e5] bg-white px-3.5 py-3.5 text-[13px] leading-5 text-[#172033] outline-none ring-0 placeholder:text-[#9aabc1] focus:border-[#5146e5] focus:ring-2 focus:ring-[#5146e5]/10 disabled:bg-slate-50 sm:min-h-[250px] sm:text-[14px] lg:min-h-[252px]"
               />
 
               <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-4 text-[#8fa0b7] sm:text-[11px]">
                 <Info size={12} strokeWidth={1.6} className="mt-0.5 shrink-0" />
 
-                <span>Tip: {question.tip}</span>
+                <span>
+                  Tip:{" "}
+                  {question.tip ||
+                    "Support your answer with a practical example."}
+                </span>
               </div>
             </div>
 
@@ -484,27 +651,29 @@ export default function AIMockInterviewActivePage() {
                   className="flex h-10 items-center justify-center gap-2 rounded-[8px] border border-[#dce4ef] bg-white px-4 text-[11px] font-semibold text-[#52627a] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:px-5 sm:text-[12px]"
                 >
                   <ArrowLeft size={14} strokeWidth={1.8} />
+
                   <span className="hidden sm:inline">Previous Question</span>
+
                   <span className="sm:hidden">Previous</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={isSubmitting || !answer.trim()}
+                  disabled={
+                    isSubmitting || remainingSeconds <= 0 || !answer.trim()
+                  }
                   className="flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[#5146e5] px-5 text-[11px] font-semibold text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition hover:bg-[#453bcf] disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:text-[12px]"
                 >
                   {isSubmitting ? (
                     <>
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Submitting...
+                      Evaluating...
                     </>
                   ) : (
                     <>
                       <span>
-                        {currentQuestion === interview.questions - 1
-                          ? "Finish Interview"
-                          : "Next Question"}
+                        {isLastQuestion ? "Finish Interview" : "Next Question"}
                       </span>
 
                       <ArrowRight size={14} strokeWidth={1.8} />
@@ -516,20 +685,18 @@ export default function AIMockInterviewActivePage() {
               {/* Mobile question dots */}
               <div className="mt-3 flex flex-col items-center gap-2 lg:hidden">
                 <div className="flex items-center gap-1.5">
-                  {interview.questionsData.map((_, index) => {
-                    const isAnswered = answeredQuestions.has(index);
+                  {questions.map((item, index) => {
+                    const isAnswered = answeredQuestions.has(item.id);
                     const isCurrent = index === currentQuestion;
 
                     return (
                       <button
-                        key={index}
+                        key={item.id}
                         type="button"
                         onClick={() => handleQuestionJump(index)}
                         disabled={
-                          !(
-                            index <= currentQuestion ||
-                            answeredQuestions.has(index)
-                          )
+                          isSubmitting ||
+                          !(index <= currentQuestion || isAnswered)
                         }
                         aria-label={`Go to question ${index + 1}`}
                         className={`h-2.5 w-2.5 rounded-full transition ${
@@ -555,20 +722,18 @@ export default function AIMockInterviewActivePage() {
 
               {/* Desktop dots */}
               <div className="mt-4 hidden items-center justify-center gap-1.5 lg:flex">
-                {interview.questionsData.map((_, index) => {
-                  const isAnswered = answeredQuestions.has(index);
+                {questions.map((item, index) => {
+                  const isAnswered = answeredQuestions.has(item.id);
                   const isCurrent = index === currentQuestion;
 
                   return (
                     <button
-                      key={index}
+                      key={item.id}
                       type="button"
                       onClick={() => handleQuestionJump(index)}
                       disabled={
-                        !(
-                          index <= currentQuestion ||
-                          answeredQuestions.has(index)
-                        )
+                        isSubmitting ||
+                        !(index <= currentQuestion || isAnswered)
                       }
                       aria-label={`Go to question ${index + 1}`}
                       className={`h-2.5 w-2.5 rounded-full transition ${
@@ -585,9 +750,7 @@ export default function AIMockInterviewActivePage() {
             </div>
           </section>
 
-          {/* =====================================================
-              RIGHT SIDEBAR
-             ===================================================== */}
+          {/* RIGHT SIDEBAR */}
           <aside className="space-y-3 lg:space-y-4">
             {/* Interview Progress */}
             <section className="rounded-[12px] border border-[#dce4ef] bg-white p-4 shadow-[0_2px_7px_rgba(15,23,42,0.04)] sm:p-5">
@@ -603,7 +766,7 @@ export default function AIMockInterviewActivePage() {
                 </div>
 
                 <span className="text-[11px] font-bold text-[#5146e5]">
-                  {questionNumber}/{interview.questions}
+                  {questionNumber}/{totalQuestions}
                 </span>
               </div>
 
@@ -615,20 +778,18 @@ export default function AIMockInterviewActivePage() {
               </div>
 
               <div className="mt-3 grid grid-cols-8 gap-1.5">
-                {interview.questionsData.map((_, index) => {
-                  const isAnswered = answeredQuestions.has(index);
+                {questions.map((item, index) => {
+                  const isAnswered = answeredQuestions.has(item.id);
                   const isCurrent = currentQuestion === index;
 
                   return (
                     <button
-                      key={index}
+                      key={item.id}
                       type="button"
                       onClick={() => handleQuestionJump(index)}
                       disabled={
-                        !(
-                          index <= currentQuestion ||
-                          answeredQuestions.has(index)
-                        )
+                        isSubmitting ||
+                        !(index <= currentQuestion || isAnswered)
                       }
                       className={`flex h-10 items-center justify-center rounded-[8px] border text-[11px] font-medium transition ${
                         isCurrent
@@ -661,7 +822,7 @@ export default function AIMockInterviewActivePage() {
 
                 <span className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#dce3ed]" />
-                  Remaining ({Math.max(interview.questions - answeredCount, 0)})
+                  Remaining ({remainingQuestions})
                 </span>
               </div>
             </section>
@@ -679,53 +840,63 @@ export default function AIMockInterviewActivePage() {
               </div>
 
               <div className="mt-3">
-                <div className="flex items-center justify-between border-b border-[#dce4ef] py-2">
+                <div className="flex items-center justify-between gap-3 border-b border-[#dce4ef] py-2">
                   <span className="text-[10px] text-[#8ca0b8] sm:text-[11px]">
                     Job
                   </span>
 
-                  <span className="text-[10px] font-semibold text-[#172033] sm:text-[11px]">
-                    {interview.job}
+                  <span className="text-right text-[10px] font-semibold text-[#172033] sm:text-[11px]">
+                    {job?.title || "Mock Interview"}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-[#dce4ef] py-2">
+                <div className="flex items-center justify-between gap-3 border-b border-[#dce4ef] py-2">
                   <span className="text-[10px] text-[#8ca0b8] sm:text-[11px]">
                     Company
                   </span>
 
-                  <span className="text-[10px] font-semibold text-[#172033] sm:text-[11px]">
-                    {interview.company}
+                  <span className="text-right text-[10px] font-semibold text-[#172033] sm:text-[11px]">
+                    {job?.company || "Company"}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-[#dce4ef] py-2">
+                <div className="flex items-center justify-between gap-3 border-b border-[#dce4ef] py-2">
                   <span className="text-[10px] text-[#8ca0b8] sm:text-[11px]">
                     Questions
                   </span>
 
                   <span className="text-[10px] font-semibold text-[#172033] sm:text-[11px]">
-                    {interview.questions} Total
+                    {totalQuestions} Total
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-b border-[#dce4ef] py-2">
+                <div className="flex items-center justify-between gap-3 border-b border-[#dce4ef] py-2">
                   <span className="text-[10px] text-[#8ca0b8] sm:text-[11px]">
                     Duration
                   </span>
 
                   <span className="text-[10px] font-semibold text-[#172033] sm:text-[11px]">
-                    {interview.duration}
+                    {durationLabel}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center justify-between gap-3 border-b border-[#dce4ef] py-2">
+                  <span className="text-[10px] text-[#8ca0b8] sm:text-[11px]">
+                    Location
+                  </span>
+
+                  <span className="text-[10px] font-semibold text-[#172033]">
+                    {job?.location || "Not specified"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-2">
                   <span className="text-[10px] text-[#8ca0b8] sm:text-[11px]">
                     Current Skill
                   </span>
 
                   <span className="rounded-[6px] bg-indigo-50 px-2.5 py-1 text-[9px] font-medium text-[#5146e5] sm:text-[10px]">
-                    {question.skill}
+                    {question.skill || "General"}
                   </span>
                 </div>
               </div>
@@ -744,7 +915,7 @@ export default function AIMockInterviewActivePage() {
               </div>
 
               <div className="mt-3 space-y-2">
-                {interview.evaluationAreas.map((area) => {
+                {EVALUATION_AREAS.map((area) => {
                   const Icon = area.icon;
 
                   return (
@@ -776,7 +947,7 @@ export default function AIMockInterviewActivePage() {
                   <Sparkles size={15} strokeWidth={1.7} />
                 </div>
 
-                <h2 className="text-[12px] font-semibold text-[#172033] sm:text-[13px]">
+                <h2 className="text-[12px] font-semibold text-[#7c3aed] sm:text-[13px]">
                   AI Interview Coach
                 </h2>
 
@@ -790,25 +961,38 @@ export default function AIMockInterviewActivePage() {
               <div className="my-3 h-px bg-[#e7defc]" />
 
               <p className="text-[10px] leading-5 text-[#586984] sm:text-[11px]">
-                Answer naturally. Your responses will be evaluated after the
-                interview is complete.
+                Answer naturally. Your responses are saved automatically and
+                evaluated after the interview is complete.
               </p>
             </section>
           </aside>
         </div>
 
-        {/* =======================================================
-            MOBILE EXIT
-           ======================================================= */}
+        {/* Mobile Exit */}
         <div className="mt-3 flex justify-center lg:hidden">
           <button
             type="button"
             onClick={handleExit}
-            disabled={isExiting}
+            disabled={isExiting || isSubmitting}
             className="flex items-center gap-1.5 text-[10px] font-medium text-[#71829a] transition hover:text-[#5146e5] disabled:opacity-50"
           >
             <X size={12} strokeWidth={1.8} />
-            Exit Interview
+
+            {isExiting ? "Saving..." : "Exit Interview"}
+          </button>
+        </div>
+
+        {/* Desktop Exit */}
+        <div className="mt-4 hidden justify-center lg:flex">
+          <button
+            type="button"
+            onClick={handleExit}
+            disabled={isExiting || isSubmitting}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-[#71829a] transition hover:text-[#5146e5] disabled:opacity-50"
+          >
+            <X size={13} strokeWidth={1.8} />
+
+            {isExiting ? "Saving..." : "Exit Interview"}
           </button>
         </div>
       </div>

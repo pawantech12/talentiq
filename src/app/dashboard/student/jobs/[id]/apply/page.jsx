@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -16,532 +16,439 @@ import {
   X,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
+import api from "@/lib/api";
+
+const MAX_FILE_SIZE = 8 * 1024 * 1024;
+
+function formatFileSize(bytes) {
+  if (!bytes) return "Size unavailable";
+  return bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 export default function ApplyPage() {
+  const params = useParams();
+  const router = useRouter();
   const fileInputRef = useRef(null);
 
-  const [resume, setResume] = useState(null);
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
+
+  const [job, setJob] = useState(null);
+  const [profileResume, setProfileResume] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [existingApplication, setExistingApplication] = useState(null);
 
-  const params = useParams();
+  useEffect(() => {
+    if (!id) return;
 
-  const id = params.id;
+    let active = true;
 
-  const router = useRouter();
+    async function loadPage() {
+      setIsLoading(true);
+      setLoadError("");
 
-  const job = {
-    initials: "AT",
-    title: "Full Stack Developer",
-    company: "ABC Technologies",
-    location: "Mumbai",
-    type: "Full-time",
-    experience: "0–2 Years",
-  };
+      try {
+        const { data } = await api.get(`/student/jobs/${id}/apply`);
 
-  const MAX_FILE_SIZE = 5 * 1024 * 1024;
+        if (!active) return;
 
-  const validateFile = (file) => {
-    if (!file) {
-      return false;
+        setJob(data.job);
+        setProfileResume(data.resume?.available ? data.resume : null);
+        setExistingApplication(data.existingApplication || null);
+      } catch (err) {
+        if (!active) return;
+
+        setLoadError(err.response?.data?.message || "Unable to load this job.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
     }
 
-    const fileName = file.name.toLowerCase();
+    loadPage();
 
-    const isPdf = file.type === "application/pdf" || fileName.endsWith(".pdf");
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const currentResume = selectedFile
+    ? {
+        name: selectedFile.name,
+        size: selectedFile.size,
+        source: "uploaded",
+      }
+    : profileResume
+      ? {
+          name: profileResume.name,
+          size: profileResume.bytes,
+          source: "profile",
+        }
+      : null;
+
+  function validateFile(file) {
+    if (!file) return false;
+
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
 
     if (!isPdf) {
-      setUploadError("Only PDF files are accepted.");
+      setError("Only PDF files are accepted.");
       return false;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError("File size must be less than 5 MB.");
+      setError("File size must be smaller than 8 MB.");
       return false;
     }
 
-    setUploadError("");
-
+    setError("");
     return true;
-  };
+  }
 
-  const handleFile = (file) => {
-    if (!file) {
-      return;
-    }
+  function handleFile(file) {
+    if (!file) return;
 
-    if (!validateFile(file)) {
-      setResume(null);
-      return;
-    }
+    if (!validateFile(file)) return;
 
-    setResume({
-      file,
-      name: file.name,
-      size: file.size,
-    });
+    setSelectedFile(file);
+    setError("");
+  }
 
-    setUploadError("");
-  };
-
-  const handleFileInput = (event) => {
+  function handleFileInput(event) {
     const file = event.target.files?.[0];
-
-    if (file) {
-      handleFile(file);
-    }
-
+    if (file) handleFile(file);
     event.target.value = "";
-  };
+  }
 
-  const handleDrop = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+  function removeSelectedFile() {
+    setSelectedFile(null);
+    setError("");
+  }
 
-    setIsDragging(false);
-
-    const file = event.dataTransfer.files?.[0];
-
-    if (file) {
-      handleFile(file);
-    }
-  };
-
-  const handleDragOver = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    setIsDragging(false);
-  };
-
-  const removeResume = () => {
-    setResume(null);
-    setUploadError("");
-  };
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) {
-      return "0 KB";
-    }
-
-    const mb = bytes / (1024 * 1024);
-
-    if (mb >= 1) {
-      return `${mb.toFixed(1)} MB`;
-    }
-
-    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  };
-
-  const handleBrowse = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleViewJobDetails = () => {
-    if (typeof window !== "undefined") {
-      window.history.back();
-    }
-  };
-
-  const handleCancel = () => {
-    if (typeof window !== "undefined") {
-      window.history.back();
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!resume) {
-      setUploadError("Please upload your resume before submitting.");
+  async function handleSubmit() {
+    if (!currentResume) {
+      setError("Upload a PDF resume or add one to your profile first.");
       return;
     }
+
+    if (!id || isSubmitting) return;
 
     setIsSubmitting(true);
+    setError("");
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const formData = new FormData();
 
-    setIsSubmitting(false);
+      // When no file is appended, the backend uses the profile resume.
+      if (selectedFile) {
+        formData.append("resume", selectedFile);
+      }
 
-    router.push(`/dashboard/student/jobs/${id}/analysis`);
-  };
+      const { data } = await api.post(`/student/jobs/${id}/apply`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 90000,
+      });
+
+      if (!data.success) {
+        throw new Error(data.message || "Application submission failed.");
+      }
+
+      router.push(`/dashboard/student/jobs/${id}/analysis`);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to submit your application. Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function goBack() {
+    router.push(`/dashboard/student/jobs/${id}`);
+  }
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-[#F8FAFC] p-6">
+        <div className="mx-auto max-w-5xl animate-pulse">
+          <div className="h-7 w-64 rounded bg-slate-200" />
+          <div className="mt-5 h-28 rounded-xl bg-white" />
+          <div className="mt-5 h-80 rounded-xl bg-white" />
+        </div>
+      </main>
+    );
+  }
+
+  if (loadError || !job) {
+    return (
+      <main className="min-h-screen bg-[#F8FAFC] p-6">
+        <div className="mx-auto max-w-3xl rounded-xl border bg-white p-6">
+          <p className="font-semibold text-red-600">
+            {loadError || "Job not found."}
+          </p>
+          <button
+            onClick={goBack}
+            className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
+          >
+            Back to Job
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#111827]">
-      <div className="mx-auto w-full  px-4 py-5 sm:px-6 sm:py-7 lg:px-7 lg:py-8">
-        {/* PAGE HEADING */}
-        <div className="mb-4 sm:mb-5 lg:mb-6">
-          <h1 className="text-[21px] font-bold leading-7 tracking-[-0.025em] text-[#111827] sm:text-[25px] lg:text-[26px]">
+      <div className="mx-auto w-full px-4 py-5 sm:px-6 sm:py-7 lg:px-7 lg:py-8">
+        <div className="mb-5">
+          <h1 className="text-[22px] font-bold sm:text-[26px]">
             Apply for {job.title}
           </h1>
-
-          <p className="mt-1 text-[13px] leading-5 text-[#64748B] sm:text-[14px]">
-            Complete your application by uploading your latest resume.
+          <p className="mt-1 text-sm text-slate-500">
+            Select your resume and submit your application for AI analysis.
           </p>
         </div>
 
-        {/* JOB SUMMARY CARD */}
-        <section className="rounded-[12px] border border-[#DCE3EE] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.02)] sm:p-4 lg:p-5">
+        <section className="rounded-xl border border-[#DCE3EE] bg-white p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] border border-[#E0E7FF] bg-[#EEF2FF] text-[14px] font-bold text-[#4F46E5] sm:h-11 sm:w-11 sm:text-[15px]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-indigo-50 font-bold text-indigo-600">
                 {job.initials}
               </div>
-
               <div className="min-w-0">
-                <h2 className="truncate text-[14px] font-bold leading-5 text-[#111827] sm:text-[15px]">
-                  {job.title}
-                </h2>
-
-                <p className="mt-0.5 text-[12px] text-[#71829B] sm:text-[13px]">
-                  {job.company}
-                </p>
+                <h2 className="truncate text-sm font-bold">{job.title}</h2>
+                <p className="text-xs text-slate-500">{job.company}</p>
               </div>
             </div>
 
             <button
-              type="button"
-              onClick={handleViewJobDetails}
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[8px] border border-[#DCE3EE] bg-white px-3 text-[11px] font-medium text-[#475569] transition hover:border-[#C7D2FE] hover:text-[#4F46E5] sm:h-9 sm:px-3.5 sm:text-[12px]"
+              onClick={goBack}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border px-3 py-2 text-xs text-slate-600 hover:border-indigo-300"
             >
-              <ArrowUpRight size={13} />
-
-              <span className="hidden sm:inline">View Job Details</span>
-
-              <span className="sm:hidden">View</span>
+              <ArrowUpRight size={14} />
+              View Job
             </button>
           </div>
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 sm:mt-2">
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#64748B] sm:text-[12px]">
-              <MapPin size={13} strokeWidth={1.7} />
-              {job.location}
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin size={14} /> {job.location}
             </span>
-
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#64748B] sm:text-[12px]">
-              <BriefcaseBusiness size={13} strokeWidth={1.7} />
-              {job.type}
+            <span className="inline-flex items-center gap-1.5">
+              <BriefcaseBusiness size={14} /> {job.employmentType}
             </span>
-
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-[#64748B] sm:text-[12px]">
-              <TrendingUp size={13} strokeWidth={1.7} />
-              {job.experience}
+            <span className="inline-flex items-center gap-1.5">
+              <TrendingUp size={14} /> {job.experienceLevel}
             </span>
           </div>
         </section>
 
-        {/* MAIN CONTENT */}
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-5">
-          {/* RESUME UPLOAD CARD */}
-          <section className="rounded-[12px] border border-[#DCE3EE] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.02)] sm:p-5 lg:p-6">
-            <div>
-              <h2 className="text-[16px] font-bold leading-5 text-[#111827] sm:text-[17px]">
-                Upload Your Resume
-              </h2>
-
-              <p className="mt-1 text-[12px] leading-5 text-[#64748B] sm:text-[13px]">
-                Upload your latest resume so ResumeAI can analyze your profile
-                against this job.
-              </p>
-            </div>
-
-            {/* DROPZONE */}
-            <div
-              onDragEnter={handleDragOver}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={handleBrowse}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  handleBrowse();
-                }
-              }}
-              className={`mt-4 flex min-h-[216px] cursor-pointer flex-col items-center justify-center rounded-[10px] border-2 border-dashed px-5 py-7 text-center transition sm:min-h-[250px] lg:min-h-[260px] ${
-                isDragging
-                  ? "border-[#4F46E5] bg-[#EEF2FF]"
-                  : "border-[#DCE3EE] bg-[#F8FAFC] hover:border-[#C7D2FE] hover:bg-[#F8FAFF]"
-              }`}
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-[11px] bg-[#EEF2FF] text-[#4F46E5] sm:h-14 sm:w-14">
-                <FileText size={25} strokeWidth={1.8} />
-              </div>
-
-              <p className="mt-4 text-[14px] font-semibold text-[#111827] sm:text-[15px]">
-                <span className="hidden sm:inline">
-                  Drag &amp; drop your resume here
-                </span>
-
-                <span className="sm:hidden">Upload your resume</span>
-              </p>
-
-              <p className="mt-1.5 text-[12px] text-[#94A3B8]">
-                <span className="hidden sm:inline">or</span>
-              </p>
-
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  handleBrowse();
-                }}
-                className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-[#4F46E5] px-5 text-[13px] font-semibold text-white shadow-[0_4px_10px_rgba(79,70,229,0.16)] transition hover:bg-[#4338CA] active:scale-[0.99]"
-              >
-                <Upload size={15} />
-                Browse Files
-              </button>
-
-              <p className="mt-3 text-[11px] text-[#94A3B8]">
-                PDF only · Maximum 5 MB
-              </p>
-            </div>
-
-            {/* HIDDEN FILE INPUT */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf,.pdf"
-              onChange={handleFileInput}
-              className="hidden"
-            />
-
-            {/* UPLOADED FILE */}
-            {resume && (
-              <div className="mt-4 rounded-[10px] border border-[#16A34A] bg-[#DCFCE7] p-3 sm:p-3.5">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-white text-[#16A34A]">
-                    <FileText size={19} strokeWidth={1.8} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                      <p className="truncate text-[12px] font-semibold text-[#16A34A] sm:text-[13px]">
-                        {resume.name}
-                      </p>
-
-                      <span className="inline-flex w-fit shrink-0 items-center rounded-full bg-[#16A34A] px-2.5 py-1 text-[10px] font-semibold text-white">
-                        Uploaded
-                      </span>
-                    </div>
-
-                    <p className="mt-0.5 text-[10px] text-[#71829B] sm:text-[11px]">
-                      PDF · {formatFileSize(resume.size)}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={removeResume}
-                    aria-label="Remove resume"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#94A3B8] transition hover:bg-white hover:text-[#16A34A]"
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-
-                <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-[#16A34A]">
-                  <CheckCircle2 size={13} />
-                  Resume ready for analysis
-                </div>
-              </div>
-            )}
-
-            {/* ERROR */}
-            {uploadError && (
-              <div className="mt-3 flex items-start gap-2 rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] p-3 text-[11px] leading-4 text-[#DC2626]">
-                <Info size={14} className="mt-0.5 shrink-0" />
-
-                <span>{uploadError}</span>
-              </div>
-            )}
-
-            {/* ANALYSIS INFO */}
-            <div className="mt-4 flex items-start gap-2 rounded-[8px] bg-[#F5F3FF] p-3">
-              <Sparkles size={15} className="mt-0.5 shrink-0 text-[#7C3AED]" />
-
-              <p className="text-[11px] leading-4 text-[#64748B] sm:text-[12px]">
-                Your resume will be analyzed against the requirements of this
-                job.
-              </p>
-            </div>
-          </section>
-
-          {/* APPLICATION PROCESS */}
-          <aside className="rounded-[12px] border border-[#DCE3EE] bg-white p-4 sm:p-5 lg:p-5">
-            <h2 className="text-[15px] font-bold text-[#111827] sm:text-[16px]">
-              Application Process
-            </h2>
-
-            <div className="relative mt-5">
-              <div className="absolute left-[12px] top-[14px] h-[184px] w-px bg-[#DCE3EE]" />
-
-              {/* STEP 1 */}
-              <div className="relative flex gap-3">
-                <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-[9px] font-bold text-white">
-                  01
-                </div>
-
-                <div className="pt-0.5">
-                  <p className="text-[13px] font-semibold text-[#4F46E5]">
-                    Upload Resume
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[#7C3AED]">
-                    Current step
-                  </p>
-                </div>
-              </div>
-
-              {/* STEP 2 */}
-              <div className="relative mt-6 flex gap-3">
-                <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1F5F9] text-[9px] font-semibold text-[#94A3B8]">
-                  02
-                </div>
-
-                <div className="pt-0.5">
-                  <p className="text-[13px] font-medium text-[#475569]">
-                    AI Resume Analysis
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[#94A3B8]">
-                    Automated screening
-                  </p>
-                </div>
-              </div>
-
-              {/* STEP 3 */}
-              <div className="relative mt-6 flex gap-3">
-                <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1F5F9] text-[9px] font-semibold text-[#94A3B8]">
-                  03
-                </div>
-
-                <div className="pt-0.5">
-                  <p className="text-[13px] font-medium text-[#475569]">
-                    Job-Specific Skill Assessment
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[#94A3B8]">
-                    Targeted evaluation
-                  </p>
-                </div>
-              </div>
-
-              {/* STEP 4 */}
-              <div className="relative mt-6 flex gap-3">
-                <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1F5F9] text-[9px] font-semibold text-[#94A3B8]">
-                  04
-                </div>
-
-                <div className="pt-0.5">
-                  <p className="text-[13px] font-medium text-[#475569]">
-                    Final Compatibility Score
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[#94A3B8]">
-                    AI-generated ranking
-                  </p>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* WHAT HAPPENS NEXT */}
-          <aside className="rounded-[12px] border border-[#DCE3EE] bg-white p-4 sm:p-5 lg:col-start-2 lg:p-5">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-[#EEF2FF] text-[#4F46E5]">
-                <Info size={14} />
-              </div>
-
-              <h2 className="text-[14px] font-bold text-[#111827]">
-                What happens next?
-              </h2>
-            </div>
-
-            <p className="mt-3 text-[11.5px] leading-[17px] text-[#64748B]">
-              After you submit, ResumeAI will analyze your resume against this
-              job. You may then be asked to complete a job-specific skill
-              assessment.
-            </p>
-          </aside>
-        </div>
-
-        {/* SUCCESS MESSAGE */}
-        {submitted && (
-          <div className="mt-4 rounded-[10px] border border-[#BBF7D0] bg-[#F0FDF4] p-3.5 sm:p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A]">
-                <CheckCircle2 size={18} />
-              </div>
-
-              <div>
-                <p className="text-[13px] font-bold text-[#166534]">
-                  Application submitted successfully
-                </p>
-
-                <p className="mt-1 text-[11px] leading-4 text-[#64748B]">
-                  Your resume has been submitted for the {job.title} position at{" "}
-                  {job.company}.
-                </p>
-              </div>
-            </div>
+        {existingApplication && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            You have already submitted an application for this job. Submitting
+            again will update your existing application and its analysis.
           </div>
         )}
 
-        {/* ACTIONS */}
-        <div
-          className={`mt-4 flex flex-col-reverse gap-2.5 border-t border-[#E2E8F0] bg-[#F8FAFC] py-3 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:py-0 lg:mt-4 ${
-            !submitted
-              ? "sticky bottom-0 z-30 -mx-4 px-4 shadow-[0_-4px_15px_rgba(15,23,42,0.05)] backdrop-blur-sm sm:static sm:mx-0 sm:px-0 sm:shadow-none sm:backdrop-blur-0"
-              : ""
-          }`}
-        >
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="rounded-xl border border-[#DCE3EE] bg-white p-4 sm:p-6">
+            <h2 className="text-base font-bold">Select Your Resume</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Your profile resume is selected automatically when available. You
+              can choose another PDF for this application.
+            </p>
+
+            {profileResume && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedFile(null);
+                  setError("");
+                }}
+                className={`mt-4 flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
+                  !selectedFile
+                    ? "border-indigo-500 bg-indigo-50"
+                    : "border-slate-200 hover:border-indigo-300"
+                }`}
+              >
+                <FileText className="shrink-0 text-indigo-600" size={22} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">
+                    {profileResume.name}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Profile resume · {formatFileSize(profileResume.bytes)}
+                  </span>
+                </span>
+                {!selectedFile && (
+                  <CheckCircle2
+                    className="shrink-0 text-indigo-600"
+                    size={20}
+                  />
+                )}
+              </button>
+            )}
+
+            {!profileResume && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                You have not uploaded a resume to your profile. Please select a
+                PDF below to continue.
+              </div>
+            )}
+
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setIsDragging(false);
+                handleFile(event.dataTransfer.files?.[0]);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`mt-4 flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center ${
+                isDragging
+                  ? "border-indigo-500 bg-indigo-50"
+                  : "border-slate-200 bg-slate-50 hover:border-indigo-300"
+              }`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                <Upload size={23} />
+              </div>
+              <p className="mt-3 text-sm font-semibold">
+                Browse or drag another resume PDF
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                PDF only · Maximum 8 MB
+              </p>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handleFileInput}
+                className="hidden"
+              />
+            </div>
+
+            {selectedFile && (
+              <div className="mt-4 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                <FileText className="shrink-0 text-green-700" size={21} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-green-800">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-xs text-green-700">
+                    Selected PDF · {formatFileSize(selectedFile.size)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeSelectedFile}
+                  aria-label="Remove selected PDF"
+                  className="rounded-full p-1 text-slate-500 hover:bg-white"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <Info size={16} className="mt-0.5 shrink-0" />
+                {error}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-start gap-2 rounded-lg bg-violet-50 p-3 text-xs leading-5 text-slate-600">
+              <Sparkles size={16} className="mt-0.5 shrink-0 text-violet-600" />
+              Your resume will be analyzed against the job description,
+              responsibilities, required skills, experience, and education.
+            </div>
+          </section>
+
+          <aside className="rounded-xl border border-[#DCE3EE] bg-white p-5">
+            <h2 className="font-bold">Application Process</h2>
+            <div className="mt-5 space-y-6">
+              {[
+                "Select Resume",
+                "Submit Application",
+                "AI Resume Analysis",
+                job.requireSkillAssessment
+                  ? "Job-Specific Skill Assessment"
+                  : "Application Review",
+              ].map((step, index) => (
+                <div key={step} className="flex items-start gap-3">
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                      index === 0
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">{step}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {index === 0
+                        ? "Current step"
+                        : "Completed after submission"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-7 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+              Your resume text and job requirements are processed securely on
+              the server. Your PDF is not sent directly from the browser to
+              Groq.
+            </div>
+          </aside>
+        </div>
+
+        <div className="sticky bottom-0 z-20 mt-5 flex flex-col-reverse gap-3 border-t bg-[#F8FAFC]/95 py-4 backdrop-blur sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={handleCancel}
+            onClick={goBack}
             disabled={isSubmitting}
-            className="h-10 w-full rounded-[8px] border border-[#DCE3EE] bg-white px-5 text-[13px] font-medium text-[#475569] transition hover:border-[#C7D2FE] hover:text-[#4F46E5] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[88px]"
+            className="h-11 rounded-lg border border-slate-200 bg-white px-6 text-sm font-medium text-slate-600 disabled:opacity-50"
           >
             Cancel
           </button>
-
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || submitted}
-            className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-[8px] px-5 text-[13px] font-semibold text-white shadow-[0_4px_10px_rgba(79,70,229,0.18)] transition sm:w-auto sm:min-w-[210px] ${
-              submitted ? "bg-[#16A34A]" : "bg-[#4F46E5] hover:bg-[#4338CA]"
-            } disabled:cursor-not-allowed disabled:opacity-70`}
+            disabled={isSubmitting || !currentResume}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? (
               <>
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                Submitting...
-              </>
-            ) : submitted ? (
-              <>
-                <Check size={15} />
-                Application Submitted
+                Submitting & Analyzing...
               </>
             ) : (
               <>
-                <Send size={15} />
+                <Send size={16} />
                 Submit Application
               </>
             )}
           </button>
         </div>
-
-        <div className="h-3 sm:hidden" />
       </div>
     </main>
   );

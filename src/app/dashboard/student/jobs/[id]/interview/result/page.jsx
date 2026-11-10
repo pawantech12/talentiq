@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
+  BriefcaseBusiness,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -18,115 +19,216 @@ import {
   Sparkles,
   Target,
   Trophy,
-  UserRound,
   Zap,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+const RESULT_API_URL = (jobId) =>
+  `/api/student/jobs/${encodeURIComponent(jobId)}/interview/result`;
+
+const EXPECTED_AREAS = [
+  {
+    name: "Technical Knowledge",
+    icon: Code2,
+    color: "green",
+  },
+  {
+    name: "Problem Solving",
+    icon: Sparkles,
+    color: "orange",
+  },
+  {
+    name: "Communication",
+    icon: MessageSquare,
+    color: "green",
+  },
+  {
+    name: "Role Understanding",
+    icon: Target,
+    color: "orange",
+  },
+];
+
+function clampScore(value) {
+  const score = Number(value);
+  if (!Number.isFinite(score)) return 0;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function getScoreLabel(score) {
+  if (score >= 90) return "Excellent Performance";
+  if (score >= 80) return "Strong Performance";
+  if (score >= 70) return "Good Performance";
+  return "Needs Improvement";
+}
+
+function formatDate(value) {
+  if (!value) return "Date unavailable";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDuration(seconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  if (minutes === 0) return `${remainingSeconds} sec`;
+
+  if (remainingSeconds === 0) return `${minutes} min`;
+
+  return `${minutes} min ${remainingSeconds} sec`;
+}
+
+function getInitials(name) {
+  if (!name) return "CO";
+
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function BriefcaseIcon() {
+  return <BriefcaseBusiness size={11} strokeWidth={1.8} aria-hidden="true" />;
+}
+
+function TimerIcon() {
+  return (
+    <Clock3 size={15} strokeWidth={1.7} className="mb-1 text-indigo-100" />
+  );
+}
+
+function LoadingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4">
+      <div className="w-full max-w-sm rounded-[12px] border border-[#dce4ef] bg-white p-7 text-center shadow-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#eef0ff] text-[#5146e5]">
+          <RefreshCw size={21} className="animate-spin" />
+        </div>
+
+        <h2 className="mt-4 text-[16px] font-bold text-[#172033]">
+          Loading Interview Result
+        </h2>
+
+        <p className="mt-2 text-[12px] text-[#8190a5]">
+          Please wait while we retrieve your interview evaluation.
+        </p>
+      </div>
+    </main>
+  );
+}
+
+function ErrorState({ message, onRetry, onDashboard }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4">
+      <div className="w-full max-w-md rounded-[12px] border border-[#dce4ef] bg-white p-7 text-center shadow-sm">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#fef3c7] text-[#b45309]">
+          <Lightbulb size={22} />
+        </div>
+
+        <h2 className="mt-4 text-[17px] font-bold text-[#172033]">
+          Unable to Load Interview Result
+        </h2>
+
+        <p className="mt-2 text-[12px] leading-5 text-[#71829a]">{message}</p>
+
+        <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="flex h-9 items-center justify-center gap-2 rounded-[7px] bg-[#5146e5] px-4 text-[11px] font-semibold text-white hover:bg-[#453bcf]"
+          >
+            <RefreshCw size={13} />
+            Try Again
+          </button>
+
+          <button
+            type="button"
+            onClick={onDashboard}
+            className="flex h-9 items-center justify-center gap-2 rounded-[7px] border border-[#dce4ef] px-4 text-[11px] font-semibold text-[#53627a] hover:bg-[#f8fafc]"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
 
 export default function AIMockInterviewResultPage() {
   const router = useRouter();
+  const params = useParams();
 
-  /*
-   * Frontend demo data.
-   * Replace this with your API/session result when backend integration
-   * is connected.
-   */
-  const result = {
-    jobTitle: "Full Stack Developer",
-    company: "ABC Technologies",
-    date: "14 Aug 2026",
+  const jobId = params?.id;
 
-    score: 84,
-    questions: 8,
-    duration: "11 min",
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-    performanceLabel: "Strong Performance",
+  const fetchResult = useCallback(async () => {
+    if (!jobId) {
+      setError(
+        "Job ID is missing. Please open the interview result from your jobs page.",
+      );
+      setLoading(false);
+      return;
+    }
 
-    skills: [
-      {
-        name: "Technical Knowledge",
-        score: 86,
-        status: "Best",
-        color: "green",
-        icon: Code2,
-      },
-      {
-        name: "Problem Solving",
-        score: 82,
-        status: "Improve",
-        color: "orange",
-        icon: Sparkles,
-      },
-      {
-        name: "Communication",
-        score: 85,
-        status: null,
-        color: "green",
-        icon: MessageSquare,
-      },
-      {
-        name: "Role Understanding",
-        score: 83,
-        status: null,
-        color: "orange",
-        icon: Target,
-      },
-    ],
+    try {
+      setLoading(true);
+      setError("");
 
-    strengths: [
-      "Strong technical fundamentals across the stack",
-      "Good understanding of full-stack concepts",
-      "Clear and structured communication style",
-      "Relevant practical knowledge of technologies",
-    ],
+      const response = await fetch(RESULT_API_URL(jobId), {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-    improvements: [
-      "Structure problem-solving answers more clearly",
-      "Explain technical decisions with practical examples",
-      "Improve confidence in complex technical scenarios",
-    ],
+      const data = await response.json();
 
-    feedback:
-      "Your overall performance was strong. You explained your technical approach clearly and demonstrated good knowledge of React, Node.js and MongoDB. Focus on structuring your problem-solving answers more clearly and explaining your decisions with practical examples.",
+      if (!response.ok || !data.success || !data.result) {
+        throw new Error(
+          data.message || "No completed interview result was found.",
+        );
+      }
 
-    recommendations: [
-      {
-        title: "Practice Node.js and Express interview questions",
-        description: "Focus on REST API design and middleware patterns",
-        number: 1,
-        color: "purple",
-      },
-      {
-        title: "Work on structured problem-solving answers",
-        description: "Use STAR method to frame your responses",
-        number: 2,
-        color: "purple",
-      },
-      {
-        title: "Practice explaining technical decisions clearly",
-        description: "Include reasoning behind technology choices",
-        number: 3,
-        color: "green",
-      },
-      {
-        title: "Try another AI mock interview",
-        description: "Apply improvements in your next practice session",
-        number: 4,
-        color: "orange",
-      },
-    ],
-  };
+      setResult(data.result);
+    } catch (err) {
+      console.error("Interview result fetch error:", err);
 
-  const scoreLabel = useMemo(() => {
-    if (result.score >= 90) return "Excellent Performance";
-    if (result.score >= 80) return "Strong Performance";
-    if (result.score >= 70) return "Good Performance";
-    return "Needs Improvement";
-  }, [result.score]);
+      setError(
+        err.message ||
+          "Something went wrong while loading your interview result.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [jobId]);
+
+  useEffect(() => {
+    fetchResult();
+  }, [fetchResult]);
 
   const handleTryAgain = () => {
-    router.push("/dashboard/student/interview");
+    router.push(`/dashboard/student/jobs/${jobId}/interview`);
   };
 
   const handleDashboard = () => {
@@ -140,6 +242,105 @@ export default function AIMockInterviewResultPage() {
   const handleBack = () => {
     router.back();
   };
+
+  const score = useMemo(() => clampScore(result?.score), [result?.score]);
+
+  const scoreLabel = useMemo(
+    () => result?.performanceLabel || getScoreLabel(score),
+    [result?.performanceLabel, score],
+  );
+
+  const skills = useMemo(() => {
+    const areas = Array.isArray(result?.areas) ? result.areas : [];
+
+    return EXPECTED_AREAS.map((expected) => {
+      const matched = areas.find(
+        (area) =>
+          String(area.name || "").toLowerCase() === expected.name.toLowerCase(),
+      );
+
+      return {
+        ...expected,
+        score: clampScore(matched?.score),
+        feedback: matched?.feedback || "Continue practicing this area.",
+      };
+    });
+  }, [result?.areas]);
+
+  const strongestArea = useMemo(() => {
+    if (!skills.length) return null;
+
+    return [...skills].sort((a, b) => b.score - a.score)[0];
+  }, [skills]);
+
+  const weakestArea = useMemo(() => {
+    if (!skills.length) return null;
+
+    return [...skills].sort((a, b) => a.score - b.score)[0];
+  }, [skills]);
+
+  const strengths = useMemo(
+    () =>
+      Array.isArray(result?.strengths) ? result.strengths.filter(Boolean) : [],
+    [result?.strengths],
+  );
+
+  const improvements = useMemo(
+    () =>
+      Array.isArray(result?.improvements)
+        ? result.improvements.filter(Boolean)
+        : [],
+    [result?.improvements],
+  );
+
+  const recommendations = useMemo(
+    () =>
+      Array.isArray(result?.recommendations)
+        ? result.recommendations.filter(Boolean)
+        : [],
+    [result?.recommendations],
+  );
+
+  const totalQuestions = Math.max(
+    0,
+    Number(result?.totalQuestions ?? result?.questions) || 0,
+  );
+
+  const answeredQuestions = Math.min(
+    totalQuestions,
+    Math.max(0, Number(result?.answeredQuestions) || 0),
+  );
+
+  const unansweredQuestions = Math.max(0, totalQuestions - answeredQuestions);
+
+  const answeredPercentage =
+    totalQuestions > 0 ? (answeredQuestions / totalQuestions) * 100 : 0;
+
+  const duration = formatDuration(result?.timeTaken ?? result?.durationSeconds);
+
+  const interviewDate = formatDate(result?.date);
+
+  const jobTitle = result?.jobTitle || "Mock Interview";
+
+  const company = result?.company || "Company";
+
+  const isExpired = result?.status === "expired";
+
+  const isFallback = result?.evaluationMode === "fallback";
+
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (error || !result) {
+    return (
+      <ErrorState
+        message={error || "Interview result is not available."}
+        onRetry={fetchResult}
+        onDashboard={handleDashboard}
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#172033]">
@@ -168,8 +369,12 @@ export default function AIMockInterviewResultPage() {
         <section className="mb-4 flex flex-col gap-3 sm:mb-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1.5 text-[10px] font-semibold text-[#16a34a] sm:text-[11px]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
-              Interview Completed
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  isExpired ? "bg-[#f59e0b]" : "bg-[#16a34a]"
+                }`}
+              />
+              {isExpired ? "Interview Time Expired" : "Interview Completed"}
             </div>
 
             <h1 className="text-[23px] font-bold leading-7 tracking-[-0.35px] text-[#172033] sm:text-[26px] sm:leading-8 lg:text-[28px]">
@@ -197,24 +402,24 @@ export default function AIMockInterviewResultPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[9px] bg-white/15 text-[14px] font-bold text-white sm:h-12 sm:w-12 sm:text-[15px]">
-                  AT
+                  {getInitials(company)}
                 </div>
 
                 <div className="min-w-0">
                   <h2 className="truncate text-[14px] font-bold sm:text-[16px] lg:text-[17px]">
-                    {result.jobTitle}
+                    {jobTitle}
                   </h2>
 
                   <p className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-indigo-100 sm:text-[11px] lg:text-[12px]">
                     <BriefcaseIcon />
-                    {result.company}
+                    {company}
                   </p>
                 </div>
               </div>
 
               <div className="text-right">
                 <div className="text-[31px] font-bold leading-8 tracking-[-1px] sm:text-[36px] sm:leading-9 lg:text-[39px]">
-                  {result.score}%
+                  {score}%
                 </div>
 
                 <div className="mt-0.5 text-[9px] font-medium text-indigo-100 sm:text-[10px]">
@@ -235,7 +440,7 @@ export default function AIMockInterviewResultPage() {
                 />
 
                 <span className="text-[10px] font-semibold sm:text-[11px] lg:text-[12px]">
-                  {result.date}
+                  {interviewDate}
                 </span>
 
                 <span className="mt-0.5 text-[8px] text-indigo-100 sm:text-[9px]">
@@ -251,11 +456,11 @@ export default function AIMockInterviewResultPage() {
                 />
 
                 <span className="text-[11px] font-semibold sm:text-[12px] lg:text-[13px]">
-                  {result.questions} / {result.questions}
+                  {answeredQuestions} / {totalQuestions}
                 </span>
 
                 <span className="mt-0.5 text-[8px] text-indigo-100 sm:text-[9px]">
-                  Questions
+                  Answered
                 </span>
               </div>
 
@@ -263,7 +468,7 @@ export default function AIMockInterviewResultPage() {
                 <TimerIcon />
 
                 <span className="text-[11px] font-semibold sm:text-[12px] lg:text-[13px]">
-                  {result.duration}
+                  {duration}
                 </span>
 
                 <span className="mt-0.5 text-[8px] text-indigo-100 sm:text-[9px]">
@@ -293,12 +498,12 @@ export default function AIMockInterviewResultPage() {
                 </h2>
 
                 <p className="mt-1 text-[10px] leading-4 text-[#8190a5] sm:text-[11px] lg:text-[12px]">
-                  Based on {result.questions} interview questions
+                  Based on {totalQuestions} interview questions
                 </p>
               </div>
 
               <span className="rounded-full bg-[#dcfce7] px-2.5 py-1.5 text-[9px] font-semibold text-[#16a34a] sm:text-[10px]">
-                Strong Performance
+                {scoreLabel}
               </span>
             </div>
 
@@ -327,13 +532,13 @@ export default function AIMockInterviewResultPage() {
                     strokeWidth="9"
                     strokeLinecap="round"
                     strokeDasharray="263.9"
-                    strokeDashoffset={263.9 - (263.9 * result.score) / 100}
+                    strokeDashoffset={263.9 - (263.9 * score) / 100}
                   />
                 </svg>
 
                 <div className="relative text-center">
                   <div className="text-[25px] font-bold leading-7 text-[#172033] sm:text-[27px]">
-                    {result.score}%
+                    {score}%
                   </div>
 
                   <div className="mt-0.5 text-[9px] font-medium leading-3 text-[#8190a5] sm:text-[10px]">
@@ -350,28 +555,32 @@ export default function AIMockInterviewResultPage() {
                 </h3>
 
                 <p className="mt-1 text-[10px] font-medium text-[#8190a5] sm:text-[11px]">
-                  Top 25% of all mock interviews
+                  Your overall interview evaluation
                 </p>
 
                 <div className="mt-3 space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] text-[#71829a] sm:text-[11px]">
-                    <span className="h-2 w-2 rounded-full bg-[#16a34a]" />
-                    <span>
-                      Best: Technical Knowledge&nbsp; {result.skills[0].score}%
-                    </span>
-                  </div>
+                  {strongestArea && (
+                    <div className="flex items-center gap-2 text-[10px] text-[#71829a] sm:text-[11px]">
+                      <span className="h-2 w-2 rounded-full bg-[#16a34a]" />
+                      <span>
+                        Best: {strongestArea.name} {strongestArea.score}%
+                      </span>
+                    </div>
+                  )}
 
-                  <div className="flex items-center gap-2 text-[10px] text-[#71829a] sm:text-[11px]">
-                    <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
-                    <span>
-                      Improve: Problem Solving&nbsp; {result.skills[1].score}%
-                    </span>
-                  </div>
+                  {weakestArea && (
+                    <div className="flex items-center gap-2 text-[10px] text-[#71829a] sm:text-[11px]">
+                      <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
+                      <span>
+                        Focus: {weakestArea.name} {weakestArea.score}%
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <p className="mt-3 text-[10px] leading-4 text-[#71829a] sm:text-[11px] sm:leading-5">
-                  You demonstrated a good understanding of the role
-                  requirements. Continue improving your technical explanations.
+                  {result.feedback ||
+                    "Review your performance breakdown and continue practicing your interview skills."}
                 </p>
               </div>
             </div>
@@ -391,12 +600,12 @@ export default function AIMockInterviewResultPage() {
               </div>
 
               <span className="text-[10px] font-medium text-[#8190a5] sm:text-[11px]">
-                4 Areas
+                {skills.length} Areas
               </span>
             </div>
 
             <div className="space-y-4">
-              {result.skills.map((skill) => {
+              {skills.map((skill) => {
                 const Icon = skill.icon;
 
                 return (
@@ -420,17 +629,18 @@ export default function AIMockInterviewResultPage() {
                         {skill.score}%
                       </span>
 
-                      {skill.status && (
-                        <span
-                          className={`rounded-[5px] px-1.5 py-0.5 text-[8px] font-semibold ${
-                            skill.status === "Best"
-                              ? "bg-[#dcfce7] text-[#16a34a]"
-                              : "bg-[#fef3c7] text-[#b45309]"
-                          }`}
-                        >
-                          {skill.status}
+                      {strongestArea?.name === skill.name && (
+                        <span className="rounded-[5px] bg-[#dcfce7] px-1.5 py-0.5 text-[8px] font-semibold text-[#16a34a]">
+                          Best
                         </span>
                       )}
+
+                      {weakestArea?.name === skill.name &&
+                        strongestArea?.name !== skill.name && (
+                          <span className="rounded-[5px] bg-[#fef3c7] px-1.5 py-0.5 text-[8px] font-semibold text-[#b45309]">
+                            Improve
+                          </span>
+                        )}
                     </div>
 
                     <div className="h-2 overflow-hidden rounded-full bg-[#eaf0fb]">
@@ -465,12 +675,12 @@ export default function AIMockInterviewResultPage() {
             </div>
 
             <p className="mt-2 text-[11px] font-semibold text-[#172033] sm:text-[12px]">
-              Technical Knowledge
+              {strongestArea?.name || "Not available"}
             </p>
 
             <div className="mt-1 flex items-end gap-2">
               <span className="text-[23px] font-bold leading-7 text-[#16a34a] sm:text-[25px]">
-                86%
+                {strongestArea?.score ?? 0}%
               </span>
 
               <span className="pb-0.5 text-[9px] font-medium text-[#15803d]">
@@ -492,12 +702,12 @@ export default function AIMockInterviewResultPage() {
             </div>
 
             <p className="mt-2 text-[11px] font-semibold text-[#172033] sm:text-[12px]">
-              Problem Solving
+              {weakestArea?.name || "Not available"}
             </p>
 
             <div className="mt-1 flex items-end gap-2">
               <span className="text-[23px] font-bold leading-7 text-[#f59e0b] sm:text-[25px]">
-                82%
+                {weakestArea?.score ?? 0}%
               </span>
 
               <span className="pb-0.5 text-[9px] font-medium text-[#b45309]">
@@ -519,12 +729,12 @@ export default function AIMockInterviewResultPage() {
             </div>
 
             <p className="mt-2 text-[11px] font-semibold text-[#172033] sm:text-[12px]">
-              Strong Performance
+              {scoreLabel}
             </p>
 
             <div className="mt-1 flex items-end gap-2">
               <span className="text-[23px] font-bold leading-7 text-[#5146e5] sm:text-[25px]">
-                84%
+                {score}%
               </span>
 
               <span className="pb-0.5 text-[9px] font-medium text-[#5146e5]">
@@ -563,25 +773,36 @@ export default function AIMockInterviewResultPage() {
           <div className="my-4 h-px bg-[#e6ddfc]" />
 
           <p className="text-[11px] leading-5 text-[#53627a] sm:text-[12px] sm:leading-6 lg:text-[13px]">
-            {result.feedback}
+            {result.feedback ||
+              "Continue practicing and reviewing your answers to improve your interview performance."}
           </p>
 
+          {isFallback && (
+            <div className="mt-3 rounded-[7px] border border-[#fde68a] bg-[#fef3c7] px-3 py-2 text-[10px] leading-4 text-[#92400e]">
+              This result uses the completion-based fallback evaluation because
+              the detailed AI evaluation was unavailable. Your score may not
+              represent a full assessment of answer quality.
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-[6px] bg-[#dcfce7] px-2.5 py-1.5 text-[9px] font-semibold text-[#15803d] sm:text-[10px]">
-              ✓ Strong React knowledge
-            </span>
+            {strengths.slice(0, 2).map((item, index) => (
+              <span
+                key={`strength-tag-${index}`}
+                className="rounded-[6px] bg-[#dcfce7] px-2.5 py-1.5 text-[9px] font-semibold text-[#15803d] sm:text-[10px]"
+              >
+                ✓ {item}
+              </span>
+            ))}
 
-            <span className="rounded-[6px] bg-[#dcfce7] px-2.5 py-1.5 text-[9px] font-semibold text-[#15803d] sm:text-[10px]">
-              ✓ Good Node.js understanding
-            </span>
-
-            <span className="rounded-[6px] bg-[#fef3c7] px-2.5 py-1.5 text-[9px] font-semibold text-[#b45309] sm:text-[10px]">
-              ↗ Improve problem structuring
-            </span>
-
-            <span className="rounded-[6px] bg-[#fef3c7] px-2.5 py-1.5 text-[9px] font-semibold text-[#b45309] sm:text-[10px]">
-              ↗ Add practical examples
-            </span>
+            {improvements.slice(0, 2).map((item, index) => (
+              <span
+                key={`improvement-tag-${index}`}
+                className="rounded-[6px] bg-[#fef3c7] px-2.5 py-1.5 text-[9px] font-semibold text-[#b45309] sm:text-[10px]"
+              >
+                ↗ {item}
+              </span>
+            ))}
           </div>
         </section>
 
@@ -601,25 +822,31 @@ export default function AIMockInterviewResultPage() {
               </div>
 
               <span className="rounded-full bg-[#dcfce7] px-2.5 py-1 text-[9px] font-semibold text-[#16a34a] sm:text-[10px]">
-                4 Identified
+                {strengths.length} Identified
               </span>
             </div>
 
             <div className="mt-4 space-y-2">
-              {result.strengths.map((strength) => (
-                <div
-                  key={strength}
-                  className="flex items-center gap-2.5 rounded-[7px] bg-[#dcfce7] px-3 py-2.5"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#16a34a] text-white">
-                    <Check size={13} strokeWidth={2.4} />
-                  </span>
+              {strengths.length > 0 ? (
+                strengths.map((strength, index) => (
+                  <div
+                    key={`strength-${index}`}
+                    className="flex items-center gap-2.5 rounded-[7px] bg-[#dcfce7] px-3 py-2.5"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#16a34a] text-white">
+                      <Check size={13} strokeWidth={2.4} />
+                    </span>
 
-                  <span className="text-[10px] font-medium leading-4 text-[#166534] sm:text-[11px]">
-                    {strength}
-                  </span>
-                </div>
-              ))}
+                    <span className="text-[10px] font-medium leading-4 text-[#166534] sm:text-[11px]">
+                      {strength}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[7px] bg-[#f8fafc] px-3 py-3 text-[11px] text-[#8190a5]">
+                  No specific strengths were returned for this interview.
+                </p>
+              )}
             </div>
           </section>
 
@@ -637,25 +864,31 @@ export default function AIMockInterviewResultPage() {
               </div>
 
               <span className="rounded-full bg-[#fef3c7] px-2.5 py-1 text-[9px] font-semibold text-[#b45309] sm:text-[10px]">
-                3 Focus Areas
+                {improvements.length} Focus Areas
               </span>
             </div>
 
             <div className="mt-4 space-y-2">
-              {result.improvements.map((item) => (
-                <div
-                  key={item}
-                  className="flex items-center gap-2.5 rounded-[7px] bg-[#fef3c7] px-3 py-2.5"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f59e0b] text-white">
-                    <ArrowRight size={13} strokeWidth={2.2} />
-                  </span>
+              {improvements.length > 0 ? (
+                improvements.map((item, index) => (
+                  <div
+                    key={`improvement-${index}`}
+                    className="flex items-center gap-2.5 rounded-[7px] bg-[#fef3c7] px-3 py-2.5"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f59e0b] text-white">
+                      <ArrowRight size={13} strokeWidth={2.2} />
+                    </span>
 
-                  <span className="text-[10px] font-medium leading-4 text-[#92400e] sm:text-[11px]">
-                    {item}
-                  </span>
-                </div>
-              ))}
+                    <span className="text-[10px] font-medium leading-4 text-[#92400e] sm:text-[11px]">
+                      {item}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[7px] bg-[#f8fafc] px-3 py-3 text-[11px] text-[#8190a5]">
+                  No improvement areas were returned for this interview.
+                </p>
+              )}
             </div>
           </section>
         </div>
@@ -677,7 +910,7 @@ export default function AIMockInterviewResultPage() {
             <div className="mt-4 grid grid-cols-3 gap-2">
               <div className="rounded-[8px] border border-[#dce4ef] bg-[#f8fafc] px-2 py-3 text-center">
                 <div className="text-[21px] font-bold text-[#172033] sm:text-[23px]">
-                  8
+                  {totalQuestions}
                 </div>
 
                 <p className="mt-1 text-[9px] font-medium text-[#8190a5] sm:text-[10px]">
@@ -687,44 +920,53 @@ export default function AIMockInterviewResultPage() {
 
               <div className="rounded-[8px] bg-[#dcfce7] px-2 py-3 text-center">
                 <div className="text-[21px] font-bold text-[#16a34a] sm:text-[23px]">
-                  6
+                  {answeredQuestions}
                 </div>
 
                 <p className="mt-1 text-[9px] font-medium text-[#15803d] sm:text-[10px]">
-                  Strong Answers
+                  Answered
                 </p>
               </div>
 
               <div className="rounded-[8px] bg-[#fef3c7] px-2 py-3 text-center">
                 <div className="text-[21px] font-bold text-[#f59e0b] sm:text-[23px]">
-                  2
+                  {unansweredQuestions}
                 </div>
 
                 <p className="mt-1 text-[9px] font-medium text-[#b45309] sm:text-[10px]">
-                  Needs Improvement
+                  Unanswered
                 </p>
               </div>
             </div>
 
             <div className="mt-4">
               <div className="mb-2 text-[10px] font-medium text-[#8190a5] sm:text-[11px]">
-                Answer Quality Distribution
+                Answer Completion Distribution
               </div>
 
               <div className="flex h-3 overflow-hidden rounded-full bg-[#eaf0fb]">
-                <div className="w-[75%] bg-[#16a34a]" />
-                <div className="w-[25%] bg-[#f59e0b]" />
+                <div
+                  className="h-full bg-[#16a34a] transition-all"
+                  style={{ width: `${answeredPercentage}%` }}
+                />
+
+                <div
+                  className="h-full bg-[#f59e0b] transition-all"
+                  style={{ width: `${100 - answeredPercentage}%` }}
+                />
               </div>
 
               <div className="mt-2 flex items-center justify-between text-[9px] font-medium text-[#8190a5] sm:text-[10px]">
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#16a34a]" />6 Strong
-                  (75%)
+                  <span className="h-2 w-2 rounded-full bg-[#16a34a]" />
+                  {answeredQuestions} Answered ({Math.round(answeredPercentage)}
+                  %)
                 </span>
 
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />2 Needs
-                  Work (25%)
+                  <span className="h-2 w-2 rounded-full bg-[#f59e0b]" />
+                  {unansweredQuestions} Unanswered (
+                  {Math.round(100 - answeredPercentage)}%)
                 </span>
               </div>
             </div>
@@ -749,34 +991,36 @@ export default function AIMockInterviewResultPage() {
             </div>
 
             <div className="mt-4 space-y-2">
-              {result.recommendations.map((item) => (
-                <div
-                  key={item.number}
-                  className="flex items-center gap-3 rounded-[7px] border border-[#dce4ef] bg-[#f8fafc] px-2.5 py-2.5"
-                >
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                      item.color === "green"
-                        ? "bg-[#16a34a]"
-                        : item.color === "orange"
-                          ? "bg-[#f59e0b]"
-                          : "bg-[#7c3aed]"
-                    }`}
+              {recommendations.length > 0 ? (
+                recommendations.map((item, index) => (
+                  <div
+                    key={`recommendation-${index}`}
+                    className="flex items-center gap-3 rounded-[7px] border border-[#dce4ef] bg-[#f8fafc] px-2.5 py-2.5"
                   >
-                    {item.number}
-                  </span>
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                        index % 3 === 0
+                          ? "bg-[#7c3aed]"
+                          : index % 3 === 1
+                            ? "bg-[#16a34a]"
+                            : "bg-[#f59e0b]"
+                      }`}
+                    >
+                      {index + 1}
+                    </span>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-semibold leading-4 text-[#172033] sm:text-[11px]">
-                      {item.title}
-                    </p>
-
-                    <p className="mt-0.5 text-[8px] leading-3.5 text-[#8190a5] sm:text-[9px]">
-                      {item.description}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold leading-4 text-[#172033] sm:text-[11px]">
+                        {item}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="rounded-[7px] bg-[#f8fafc] px-3 py-3 text-[11px] text-[#8190a5]">
+                  No recommendations are available for this interview.
+                </p>
+              )}
             </div>
           </section>
         </div>
@@ -837,51 +1081,5 @@ export default function AIMockInterviewResultPage() {
         </button>
       </div>
     </main>
-  );
-}
-
-/*
- * Small inline icon helpers.
- * These are not separate components; they simply keep the main JSX readable.
- */
-function BriefcaseIcon() {
-  return (
-    <span className="inline-flex items-center">
-      <svg
-        width="11"
-        height="11"
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path
-          d="M9 7V5.5C9 4.67 9.67 4 10.5 4h3c.83 0 1.5.67 1.5 1.5V7"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-        <rect
-          x="4"
-          y="7"
-          width="16"
-          height="12"
-          rx="2"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        />
-        <path
-          d="M4 11h16M10 11v2h4v-2"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      </svg>
-    </span>
-  );
-}
-
-function TimerIcon() {
-  return (
-    <Clock3 size={15} strokeWidth={1.7} className="mb-1 text-indigo-100" />
   );
 }
