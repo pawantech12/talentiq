@@ -21,6 +21,19 @@ export async function PATCH(request) {
       );
     }
 
+    const expectedFolder = `resumeai/users/${user._id}/resumes/`;
+
+    if (
+      typeof file.publicId !== "string" ||
+      !file.publicId.startsWith(expectedFolder) ||
+      file.resourceType !== "raw"
+    ) {
+      return NextResponse.json(
+        { message: "Invalid resume ownership or file type" },
+        { status: 400 },
+      );
+    }
+
     const profile = user.profile?.toObject?.() || user.profile || {};
     const student = profile.student || {};
 
@@ -76,6 +89,16 @@ export async function DELETE() {
     const profile = user.profile?.toObject?.() || user.profile || {};
     const student = profile.student || {};
     const resume = student.resume;
+
+    if (
+      resume?.publicId &&
+      !resume.publicId.startsWith(`resumeai/users/${user._id}/resumes/`)
+    ) {
+      return NextResponse.json(
+        { message: "Invalid resume ownership" },
+        { status: 403 },
+      );
+    }
 
     if (resume?.publicId) {
       await cloudinary.uploader.destroy(resume.publicId, {

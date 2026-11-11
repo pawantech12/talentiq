@@ -28,6 +28,9 @@ export function useStudentProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [aiInsight, setAiInsight] = useState(null);
+  const [aiInsightLoading, setAiInsightLoading] = useState(true);
+  const [aiInsightError, setAiInsightError] = useState("");
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -75,6 +78,37 @@ export function useStudentProfile() {
   useEffect(() => {
     loadProfile().catch(() => {});
   }, [loadProfile]);
+
+  const loadAIProfileInsight = useCallback(async () => {
+    try {
+      setAiInsightLoading(true);
+      setAiInsightError("");
+
+      const response = await api.get("/profile/ai-insight");
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message || "Unable to generate AI insight.",
+        );
+      }
+
+      setAiInsight(response.data.insight);
+    } catch (error) {
+      setAiInsight(null);
+
+      setAiInsightError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load AI profile insight.",
+      );
+    } finally {
+      setAiInsightLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAIProfileInsight();
+  }, [loadAIProfileInsight]);
 
   const updateProfile = useCallback(async (changes) => {
     setSaving(true);
@@ -241,5 +275,10 @@ export function useStudentProfile() {
 
     saveEducation,
     deleteEducation,
+
+    aiInsightLoading,
+    aiInsight,
+    loadAIProfileInsight,
+    aiInsightError,
   };
 }

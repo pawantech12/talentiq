@@ -42,11 +42,6 @@ const studentNavigation = [
     icon: BriefcaseBusiness,
   },
   {
-    label: "My Resume",
-    href: "/dashboard/student/resume",
-    icon: FileText,
-  },
-  {
     label: "Assessments",
     href: "/dashboard/student/assessments",
     icon: ClipboardCheck,
@@ -209,7 +204,7 @@ export default function DashboardSidebar({
         studentNavigation[1], // Find Jobs
         studentNavigation[2], // Applications
         studentNavigation[3], // Resume
-        studentNavigation[7], // Profile
+        studentNavigation[6], // Profile
       ];
 
   /*
@@ -764,10 +759,6 @@ export default function DashboardSidebar({
 
             if (item.label === "My Applications") {
               mobileLabel = "Applications";
-            }
-
-            if (item.label === "My Resume") {
-              mobileLabel = "Resume";
             }
           }
 

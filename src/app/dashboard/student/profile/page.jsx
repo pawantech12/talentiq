@@ -26,6 +26,11 @@ import { useMemo, useRef, useState } from "react";
 import { useStudentProfile } from "./useStudentProfile.js";
 import ProfileProjectForms from "./ProfileProjectForms.jsx";
 import api from "@/lib/api.js";
+import { ExternalLink } from "lucide-react";
+import { Github } from "lucide-react";
+import { ImageIcon } from "lucide-react";
+import { Link2 } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 export default function StudentProfilePage() {
   const resumeInputRef = useRef(null);
@@ -47,6 +52,10 @@ export default function StudentProfilePage() {
 
     saveEducation,
     deleteEducation,
+    aiInsightLoading,
+    aiInsight,
+    loadAIProfileInsight,
+    aiInsightError,
   } = useStudentProfile();
 
   const [projectModal, setProjectModal] = useState(false);
@@ -705,51 +714,72 @@ export default function StudentProfilePage() {
                   {education.map((item, index) => (
                     <div
                       key={item._id || index}
-                      className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                      className="group relative overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C7D2FE] hover:shadow-[0_8px_24px_rgba(79,70,229,0.08)] sm:p-5"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
-                          <GraduationCap size={18} strokeWidth={1.7} />
+                      {/* Subtle decorative accent */}
+                      <div className="absolute left-0 top-0 h-full w-[3px] bg-gradient-to-b from-[#5146E5] to-[#A5B4FC] opacity-70 transition-opacity group-hover:opacity-100" />
+
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {/* Education icon */}
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E0E7FF] bg-gradient-to-br from-[#EEF1FF] to-[#F5F3FF] text-[#5146E5] shadow-sm sm:h-12 sm:w-12">
+                          <GraduationCap size={21} strokeWidth={1.8} />
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <h3 className="text-[12px] font-bold leading-5 text-[#172033] sm:text-[13px]">
+                          {/* Title and actions */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="break-words text-[13px] font-bold leading-5 tracking-[-0.2px] text-[#172033] sm:text-[14px]">
                                 {item.degree}
                               </h3>
 
-                              <p className="mt-0.5 text-[11px] font-medium text-[#52627B] sm:text-[12px]">
-                                {item.university}
-                              </p>
+                              <div className="mt-1 flex items-start gap-1.5 text-[#64748B]">
+                                <GraduationCap
+                                  size={13}
+                                  strokeWidth={1.8}
+                                  className="mt-0.5 shrink-0 text-[#8B95AA]"
+                                />
+                                <p className="break-words text-[11px] font-medium leading-4 sm:text-[12px]">
+                                  {item.university}
+                                </p>
+                              </div>
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-2">
+                            {/* Action buttons */}
+                            <div className="flex shrink-0 items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => openEducationEditor(item)}
-                                className="text-[#5146E5]"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-all hover:border-[#E0E7FF] hover:bg-[#EEF1FF] hover:text-[#5146E5] focus:outline-none focus:ring-2 focus:ring-[#A5B4FC]"
                                 aria-label="Edit education"
+                                title="Edit education"
                               >
-                                <Pencil size={14} />
+                                <Pencil size={14} strokeWidth={1.9} />
                               </button>
 
                               <button
                                 type="button"
                                 onClick={() => handleDeleteEducation(item._id)}
-                                className="text-red-500"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#94A3B8] transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
                                 aria-label="Delete education"
+                                title="Delete education"
                               >
-                                <X size={15} />
+                                <X size={16} strokeWidth={1.9} />
                               </button>
                             </div>
                           </div>
 
+                          {/* Education period */}
                           {item.period && (
-                            <p className="mt-2 flex items-center gap-1 text-[10px] text-[#8FA0B8] sm:text-[11px]">
-                              <CalendarDays size={11} />
-                              {item.period}
-                            </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-[#E8ECF5] bg-[#F8FAFC] px-2.5 py-1 text-[10px] font-semibold text-[#64748B] sm:text-[11px]">
+                                <CalendarDays
+                                  size={12}
+                                  className="text-[#8B95AA]"
+                                />
+                                {item.period}
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -758,15 +788,23 @@ export default function StudentProfilePage() {
                 </div>
               )}
             </section>
-            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-sm sm:p-4 lg:p-5">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[15px] font-bold text-[#172033]">
-                    Project Experience
-                  </h2>
-                  <p className="text-[10px] text-[#8FA0B8]">
-                    {projects.length} projects added
-                  </p>
+
+            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-4 lg:p-5">
+              {/* Header */}
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#E0E7FF] bg-gradient-to-br from-[#EEF1FF] to-[#F5F3FF] text-[#5146E5]">
+                    <Code2 size={18} strokeWidth={1.8} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-[15px] font-bold text-[#172033] sm:text-[16px]">
+                      Project Experience
+                    </h2>
+                    <p className="mt-0.5 text-[10px] font-medium text-[#8FA0B8]">
+                      {projects.length} projects added
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -775,21 +813,27 @@ export default function StudentProfilePage() {
                     setEditingProject(null);
                     setProjectModal(true);
                   }}
-                  className="flex h-[32px] items-center gap-1.5 rounded-[6px] bg-[#5146E5] px-3 text-[11px] font-semibold text-white"
+                  className="flex h-[30px] items-center gap-1.5 rounded-[6px] border border-[#DCE4EE] bg-white px-2.5 text-[11px] font-medium text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
                 >
                   <Plus size={13} />
-                  Add Project
+                  Add
                 </button>
               </div>
 
+              {/* Empty State */}
               {projects.length === 0 ? (
-                <div className="rounded-[8px] border border-dashed border-[#DCE4EE] p-5 text-center">
-                  <Code2 className="mx-auto mb-2 text-[#8FA0B8]" size={24} />
+                <div className="rounded-xl border border-dashed border-[#DCE4EE] bg-[#FAFBFE] p-7 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-[#E0E7FF] bg-[#EEF1FF] text-[#5146E5]">
+                    <Code2 size={23} />
+                  </div>
+
                   <p className="text-[12px] font-semibold text-[#52627B]">
                     No projects added yet
                   </p>
-                  <p className="mt-1 text-[10px] text-[#8FA0B8]">
-                    Add your academic, personal or professional projects.
+
+                  <p className="mt-1 text-[10px] leading-5 text-[#8FA0B8]">
+                    Showcase your academic, personal or professional projects
+                    here.
                   </p>
                 </div>
               ) : (
@@ -797,90 +841,151 @@ export default function StudentProfilePage() {
                   {projects.map((project) => (
                     <div
                       key={project._id}
-                      className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                      className="group relative overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-3.5 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C7D2FE] hover:shadow-[0_8px_24px_rgba(79,70,229,0.08)] sm:p-4"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-[13px] font-bold text-[#172033]">
-                            {project.title}
-                          </h3>
+                      {/* Left Accent */}
+                      <div className="absolute left-0 top-0 h-full w-[3px] bg-gradient-to-b from-[#5146E5] to-[#A5B4FC] opacity-70 transition-opacity group-hover:opacity-100" />
 
-                          <p className="mt-1 whitespace-pre-wrap text-[11px] leading-5 text-[#71839E]">
-                            {project.description}
-                          </p>
-                        </div>
-
-                        <div className="flex shrink-0 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingProject(project);
-                              setProjectModal(true);
-                            }}
-                            className="text-[#5146E5]"
-                            aria-label="Edit project"
-                          >
-                            <Pencil size={15} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteProject(project._id)}
-                            className="text-red-500"
-                            aria-label="Delete project"
-                          >
-                            <X size={15} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {project.technologies?.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {project.technologies.map((technology) => (
-                            <span
-                              key={technology}
-                              className="rounded-[5px] bg-[#EEF1FF] px-2 py-1 text-[9px] font-semibold text-[#5146E5]"
-                            >
-                              {technology}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-semibold">
-                        {project.projectUrl && (
-                          <a
-                            href={project.projectUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#5146E5]"
-                          >
-                            Live Project ↗
-                          </a>
-                        )}
-
-                        {project.repositoryUrl && (
-                          <a
-                            href={project.repositoryUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#5146E5]"
-                          >
-                            Source Code ↗
-                          </a>
-                        )}
-                      </div>
-
-                      {project.media?.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {project.media.map((media) => (
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                        {/* Project Preview - Left Side */}
+                        <div className="relative h-[150px] w-full shrink-0 overflow-hidden rounded-lg border border-[#E2E8F0] bg-gradient-to-br from-[#F1F5FF] to-[#F8FAFC] sm:h-[125px] sm:w-[155px] lg:h-[135px] lg:w-[175px]">
+                          {project.media?.length > 0 ? (
                             <img
-                              key={media.publicId}
-                              src={media.secureUrl}
-                              alt={`${project.title} screenshot`}
-                              className="h-16 w-20 rounded-md border border-[#DCE4EE] object-cover"
+                              src={project.media[0].secureUrl}
+                              alt={`${project.title} preview`}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                             />
-                          ))}
+                          ) : (
+                            <div className="flex h-full flex-col items-center justify-center gap-2 text-[#A5B4FC]">
+                              <Code2 size={32} strokeWidth={1.4} />
+                              <span className="text-[10px] font-semibold text-[#8B95AA]">
+                                Project Preview
+                              </span>
+                            </div>
+                          )}
+
+                          {project.media?.length > 1 && (
+                            <span className="absolute bottom-2 right-2 rounded-md border border-white/70 bg-white/90 px-2 py-1 text-[9px] font-bold text-[#5146E5] shadow-sm">
+                              +{project.media.length - 1} images
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Project Details - Right Side */}
+                        <div className="min-w-0 flex-1">
+                          {/* Title and Actions */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="break-words text-[13px] font-bold leading-5 tracking-[-0.2px] text-[#172033] sm:text-[14px]">
+                                {project.title}
+                              </h3>
+
+                              <p className="mt-1 text-[10px] font-medium text-[#8FA0B8]">
+                                Personal / Academic Project
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingProject(project);
+                                  setProjectModal(true);
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-all hover:border-[#E0E7FF] hover:bg-[#EEF1FF] hover:text-[#5146E5] focus:outline-none focus:ring-2 focus:ring-[#A5B4FC]"
+                                aria-label="Edit project"
+                                title="Edit project"
+                              >
+                                <Pencil size={14} strokeWidth={1.9} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProject(project._id)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#94A3B8] transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                aria-label="Delete project"
+                                title="Delete project"
+                              >
+                                <X size={16} strokeWidth={1.9} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          {project.description && (
+                            <p className="mt-2 whitespace-pre-wrap text-[11px] leading-[1.7] text-[#71839E] line-clamp-3">
+                              {project.description}
+                            </p>
+                          )}
+
+                          {/* Technologies */}
+                          {project.technologies?.length > 0 && (
+                            <div className="mt-3">
+                              <p className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.7px] text-[#94A3B8]">
+                                Technologies Used
+                              </p>
+
+                              <div className="flex flex-wrap gap-1.5">
+                                {project.technologies.map((technology) => (
+                                  <span
+                                    key={technology}
+                                    className="rounded-md border border-[#E0E7FF] bg-[#EEF1FF] px-2 py-1 text-[9px] font-semibold text-[#5146E5]"
+                                  >
+                                    {technology}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Project Links */}
+                          {(project.projectUrl || project.repositoryUrl) && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {project.projectUrl && (
+                                <a
+                                  href={project.projectUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-[#E0E7FF] bg-[#F5F3FF] px-2.5 py-1.5 text-[10px] font-semibold text-[#5146E5] transition hover:bg-[#EEF1FF]"
+                                >
+                                  <ExternalLink size={11} />
+                                  Live Project
+                                </a>
+                              )}
+
+                              {project.repositoryUrl && (
+                                <a
+                                  href={project.repositoryUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-md border border-[#E2E8F0] bg-[#F8FAFC] px-2.5 py-1.5 text-[10px] font-semibold text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
+                                >
+                                  <Github size={12} />
+                                  Source Code
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Additional Project Images */}
+                      {project.media?.length > 1 && (
+                        <div className="mt-3 border-t border-[#EEF1F5] pt-3">
+                          <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.7px] text-[#94A3B8]">
+                            Project Screenshots
+                          </p>
+
+                          <div className="flex flex-wrap gap-2">
+                            {project.media.slice(1).map((media) => (
+                              <img
+                                key={media.publicId}
+                                src={media.secureUrl}
+                                alt={`${project.title} screenshot`}
+                                className="h-[58px] w-[78px] rounded-md border border-[#DCE4EE] object-cover transition hover:border-[#A5B4FC] hover:shadow-sm"
+                              />
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -888,15 +993,154 @@ export default function StudentProfilePage() {
                 </div>
               )}
             </section>
-            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-sm sm:p-4 lg:p-5">
+
+            {/* Experience */}
+
+            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-4 lg:p-5">
               <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <h2 className="text-[15px] font-bold text-[#172033]">
-                    Portfolio Links
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
+                    <BriefcaseBusiness size={16} strokeWidth={1.7} />
+                  </div>
+
+                  <h2 className="text-[15px] font-bold text-[#172033] sm:text-[16px]">
+                    Experience
                   </h2>
-                  <p className="text-[10px] text-[#8FA0B8]">
-                    {portfolioLinks.length} links added
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openExperienceEditor()}
+                  className="flex h-[30px] items-center gap-1.5 rounded-[6px] border border-[#DCE4EE] bg-white px-2.5 text-[11px] font-medium text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
+                >
+                  <Plus size={12} />
+                  Add
+                </button>
+              </div>
+
+              {experiences.length === 0 ? (
+                <div className="rounded-[8px] border border-dashed border-[#DCE4EE] p-5 text-center">
+                  <BriefcaseBusiness
+                    className="mx-auto mb-2 text-[#8FA0B8]"
+                    size={24}
+                  />
+
+                  <p className="text-[12px] font-semibold text-[#52627B]">
+                    No experience added yet
                   </p>
+
+                  <p className="mt-1 text-[10px] text-[#8FA0B8]">
+                    Add your internships, work experience or professional roles.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {experiences.map((experience, index) => (
+                    <div
+                      key={experience._id || index}
+                      className="group relative overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C7D2FE] hover:shadow-[0_8px_24px_rgba(79,70,229,0.08)] sm:p-5"
+                    >
+                      {/* Decorative accent */}
+                      <div className="absolute left-0 top-0 h-full w-[3px] bg-gradient-to-b from-[#5146E5] to-[#A5B4FC] opacity-70 transition-opacity group-hover:opacity-100" />
+
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {/* Experience icon */}
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E0E7FF] bg-gradient-to-br from-[#EEF1FF] to-[#F5F3FF] text-[#5146E5] shadow-sm sm:h-12 sm:w-12">
+                          <Code2 size={21} strokeWidth={1.8} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          {/* Title and actions */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="break-words text-[13px] font-bold leading-5 tracking-[-0.2px] text-[#172033] sm:text-[14px]">
+                                {experience.title}
+                              </h3>
+
+                              <div className="mt-1 flex items-start gap-1.5 text-[#64748B]">
+                                <BriefcaseBusiness
+                                  size={13}
+                                  strokeWidth={1.8}
+                                  className="mt-0.5 shrink-0 text-[#8B95AA]"
+                                />
+
+                                <p className="break-words text-[11px] font-medium leading-4 sm:text-[12px]">
+                                  {experience.company}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openExperienceEditor(experience)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-all hover:border-[#E0E7FF] hover:bg-[#EEF1FF] hover:text-[#5146E5] focus:outline-none focus:ring-2 focus:ring-[#A5B4FC]"
+                                aria-label="Edit experience"
+                                title="Edit experience"
+                              >
+                                <Pencil size={14} strokeWidth={1.9} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteExperience(experience._id)
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#94A3B8] transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                                aria-label="Delete experience"
+                                title="Delete experience"
+                              >
+                                <X size={16} strokeWidth={1.9} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Duration */}
+                          {experience.duration && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-[#E8ECF5] bg-[#F8FAFC] px-2.5 py-1 text-[10px] font-semibold text-[#64748B] sm:text-[11px]">
+                                <CalendarDays
+                                  size={12}
+                                  className="text-[#8B95AA]"
+                                />
+                                {experience.duration}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Description */}
+                          {experience.description && (
+                            <div className="mt-3 border-t border-[#F1F5F9] pt-3">
+                              <p className="whitespace-pre-line break-words text-[11px] leading-[1.7] text-[#71839E] sm:text-[12px]">
+                                {experience.description}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-4 lg:p-5">
+              {/* Header */}
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
+                    <Link2 size={16} strokeWidth={1.8} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-[15px] font-bold text-[#172033] sm:text-[16px]">
+                      Portfolio Links
+                    </h2>
+                    <p className="mt-0.5 text-[10px] text-[#8FA0B8]">
+                      {portfolioLinks.length} links added
+                    </p>
+                  </div>
                 </div>
 
                 <button
@@ -905,67 +1149,113 @@ export default function StudentProfilePage() {
                     setEditingPortfolio(null);
                     setPortfolioModal(true);
                   }}
-                  className="flex h-[32px] items-center gap-1.5 rounded-[6px] bg-[#5146E5] px-3 text-[11px] font-semibold text-white"
+                  className="flex h-[30px] items-center gap-1.5 rounded-[6px] border border-[#DCE4EE] bg-white px-2.5 text-[11px] font-medium text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
                 >
                   <Plus size={13} />
-                  Add Link
+                  Add
                 </button>
               </div>
 
+              {/* Empty State */}
               {portfolioLinks.length === 0 ? (
-                <p className="rounded-[8px] border border-dashed border-[#DCE4EE] p-4 text-center text-[11px] text-[#8FA0B8]">
-                  Add your GitHub, LinkedIn or portfolio website.
-                </p>
+                <div className="rounded-xl border border-dashed border-[#DCE4EE] bg-[#FAFBFF] p-6 text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-[#E0E7FF] bg-gradient-to-br from-[#EEF1FF] to-[#F5F3FF] text-[#5146E5]">
+                    <Link2 size={22} strokeWidth={1.8} />
+                  </div>
+
+                  <p className="text-[12px] font-semibold text-[#52627B]">
+                    No portfolio links added yet
+                  </p>
+
+                  <p className="mx-auto mt-1 max-w-[240px] text-[10px] leading-5 text-[#8FA0B8]">
+                    Showcase your GitHub, LinkedIn, personal portfolio or other
+                    professional profiles.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPortfolio(null);
+                      setPortfolioModal(true);
+                    }}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[#E0E7FF] bg-white px-3 py-2 text-[10px] font-semibold text-[#5146E5] transition hover:bg-[#EEF1FF]"
+                  >
+                    <Plus size={12} />
+                    Add your first link
+                  </button>
+                </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {portfolioLinks.map((link) => (
                     <div
                       key={link._id}
-                      className="flex items-center justify-between gap-3 rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
+                      className="group relative overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.03)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C7D2FE] hover:shadow-[0_8px_24px_rgba(79,70,229,0.08)] sm:p-5"
                     >
-                      <div className="min-w-0">
-                        <p className="text-[12px] font-bold text-[#172033]">
-                          {link.title}
-                        </p>
-                        <p className="truncate text-[10px] text-[#8FA0B8]">
-                          {link.url}
-                        </p>
-                        <span className="text-[9px] font-semibold text-[#5146E5]">
-                          {link.type}
-                        </span>
-                      </div>
+                      {/* Decorative accent */}
+                      <div className="absolute left-0 top-0 h-full w-[3px] bg-gradient-to-b from-[#5146E5] to-[#A5B4FC] opacity-70 transition-opacity group-hover:opacity-100" />
 
-                      <div className="flex shrink-0 gap-2">
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[#5146E5]"
-                          aria-label="Open portfolio link"
-                        >
-                          <Eye size={15} />
-                        </a>
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        {/* Link Icon */}
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#E0E7FF] bg-gradient-to-br from-[#EEF1FF] to-[#F5F3FF] text-[#5146E5] shadow-sm sm:h-12 sm:w-12">
+                          <Link2 size={20} strokeWidth={1.8} />
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPortfolio(link);
-                            setPortfolioModal(true);
-                          }}
-                          className="text-[#5146E5]"
-                          aria-label="Edit portfolio link"
-                        >
-                          <Pencil size={15} />
-                        </button>
+                        {/* Link Information */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="break-words text-[13px] font-bold leading-5 tracking-[-0.2px] text-[#172033] sm:text-[14px]">
+                              {link.title}
+                            </h3>
+                          </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePortfolio(link._id)}
-                          className="text-red-500"
-                          aria-label="Delete portfolio link"
-                        >
-                          <X size={15} />
-                        </button>
+                          <p className="mt-1 truncate text-[10px] font-medium text-[#8FA0B8] sm:text-[11px]">
+                            {link.url}
+                          </p>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#E8ECF5] bg-[#F8FAFC] px-2.5 py-1 text-[10px] font-semibold text-[#64748B]">
+                              <Link2 size={11} className="text-[#8B95AA]" />
+                              {link.type}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-all hover:border-[#E0E7FF] hover:bg-[#EEF1FF] hover:text-[#5146E5] focus:outline-none focus:ring-2 focus:ring-[#A5B4FC]"
+                            aria-label="Open portfolio link"
+                            title="Open link"
+                          >
+                            <Eye size={14} strokeWidth={1.9} />
+                          </a>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPortfolio(link);
+                              setPortfolioModal(true);
+                            }}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#64748B] transition-all hover:border-[#E0E7FF] hover:bg-[#EEF1FF] hover:text-[#5146E5] focus:outline-none focus:ring-2 focus:ring-[#A5B4FC]"
+                            aria-label="Edit portfolio link"
+                            title="Edit link"
+                          >
+                            <Pencil size={14} strokeWidth={1.9} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePortfolio(link._id)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#94A3B8] transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-200"
+                            aria-label="Delete portfolio link"
+                            title="Delete link"
+                          >
+                            <X size={16} strokeWidth={1.9} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1050,108 +1340,6 @@ export default function StudentProfilePage() {
               </div>
             </section>
 
-            {/* Experience */}
-            <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-4 lg:p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
-                    <BriefcaseBusiness size={16} strokeWidth={1.7} />
-                  </div>
-
-                  <h2 className="text-[15px] font-bold text-[#172033] sm:text-[16px]">
-                    Experience
-                  </h2>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => openExperienceEditor()}
-                  className="flex h-[30px] items-center gap-1.5 rounded-[6px] border border-[#DCE4EE] bg-white px-2.5 text-[11px] font-medium text-[#64748B] transition hover:border-[#C7D2FE] hover:text-[#5146E5]"
-                >
-                  <Plus size={12} />
-                  Add
-                </button>
-              </div>
-
-              {experiences.length === 0 ? (
-                <div className="rounded-[8px] border border-dashed border-[#DCE4EE] p-5 text-center">
-                  <BriefcaseBusiness
-                    className="mx-auto mb-2 text-[#8FA0B8]"
-                    size={24}
-                  />
-                  <p className="text-[12px] font-semibold text-[#52627B]">
-                    No experience added yet
-                  </p>
-                  <p className="mt-1 text-[10px] text-[#8FA0B8]">
-                    Add your internships, work experience or professional roles.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {experiences.map((experience, index) => (
-                    <div
-                      className="rounded-[8px] border border-[#DCE4EE] bg-[#F8FAFC] p-3"
-                      key={experience._id || index}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[7px] bg-[#EEF1FF] text-[#5146E5]">
-                          <Code2 size={18} strokeWidth={1.7} />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <h3 className="text-[12px] font-bold leading-5 text-[#172033] sm:text-[13px]">
-                                {experience.title}
-                              </h3>
-
-                              <p className="mt-0.5 text-[11px] font-medium text-[#52627B] sm:text-[12px]">
-                                {experience.company}
-                              </p>
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openExperienceEditor(experience)}
-                                className="text-[#5146E5]"
-                                aria-label="Edit experience"
-                              >
-                                <Pencil size={14} />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteExperience(experience._id)
-                                }
-                                className="text-red-500"
-                                aria-label="Delete experience"
-                              >
-                                <X size={15} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {experience.duration && (
-                            <span className="mt-2 inline-block rounded-full bg-[#EEF1FF] px-2.5 py-1 text-[9px] font-semibold text-[#5146E5]">
-                              {experience.duration}
-                            </span>
-                          )}
-
-                          {experience.description && (
-                            <p className="mt-2 text-[10px] leading-5 text-[#71839E] sm:text-[11px]">
-                              {experience.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
             {/* Resume */}
             <section className="rounded-[11px] border border-[#DCE4EE] bg-white p-3.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] sm:p-4 lg:p-5">
               <div className="mb-3 flex items-center justify-between">
@@ -1231,6 +1419,8 @@ export default function StudentProfilePage() {
             </section>
 
             {/* AI Profile Insight */}
+
+            {/* AI Profile Insight */}
             <section className="rounded-[11px] border border-[#E7DEFC] bg-[#F6F2FF] p-3.5 sm:p-4 lg:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2.5">
@@ -1244,37 +1434,90 @@ export default function StudentProfilePage() {
                     </h2>
 
                     <p className="text-[10px] font-medium text-[#7C3AED]">
-                      Powered by ResumeAI
+                      Powered by GroqAI
                     </p>
                   </div>
                 </div>
 
-                <Sparkles
-                  size={15}
-                  className="text-[#7C3AED]"
-                  strokeWidth={1.7}
-                />
+                <button
+                  type="button"
+                  onClick={loadAIProfileInsight}
+                  disabled={aiInsightLoading}
+                  title="Refresh AI insight"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-[#7C3AED] transition hover:bg-[#EDE9FE] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <RefreshCw
+                    size={14}
+                    className={aiInsightLoading ? "animate-spin" : ""}
+                  />
+                </button>
               </div>
 
               <div className="my-3 h-px bg-[#E7DEFC]" />
 
-              <p className="text-[11px] leading-5 text-[#52627B] sm:text-[12px]">
-                Your profile has strong alignment with Full Stack Developer
-                roles. Adding more project experience and backend-focused skills
-                can improve your job matching and overall AI score.
-              </p>
+              {aiInsightLoading ? (
+                <div className="space-y-2.5 py-1">
+                  <div className="h-2.5 w-full animate-pulse rounded bg-[#E5DDF8]" />
+                  <div className="h-2.5 w-[90%] animate-pulse rounded bg-[#E5DDF8]" />
+                  <div className="h-2.5 w-[72%] animate-pulse rounded bg-[#E5DDF8]" />
 
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <span className="rounded-[6px] bg-[#D9FBE8] px-2.5 py-1.5 text-[9px] font-semibold text-[#07883E]">
-                  <Check size={11} className="mr-1 inline" />
-                  Strong job alignment
-                </span>
+                  <p className="pt-1 text-[10px] font-medium text-[#7C3AED]">
+                    Analyzing your profile with AI...
+                  </p>
+                </div>
+              ) : aiInsightError ? (
+                <div className="py-1">
+                  <p className="text-[11px] leading-5 text-[#B45309]">
+                    {aiInsightError}
+                  </p>
 
-                <span className="rounded-[6px] bg-[#FFF0C2] px-2.5 py-1.5 text-[9px] font-semibold text-[#A85A00]">
-                  <Target size={11} className="mr-1 inline" />
-                  Add project experience
-                </span>
-              </div>
+                  <button
+                    type="button"
+                    onClick={loadAIProfileInsight}
+                    className="mt-2 rounded-md bg-[#EDE9FE] px-3 py-1.5 text-[10px] font-semibold text-[#7C3AED] transition hover:bg-[#DDD6FE]"
+                  >
+                    Try again
+                  </button>
+                </div>
+              ) : aiInsight ? (
+                <>
+                  <div className="mb-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#7C3AED]">
+                      Recommended career direction
+                    </p>
+
+                    <p className="mt-1 text-[12px] font-bold text-[#172033]">
+                      {aiInsight.targetRole}
+                    </p>
+                  </div>
+
+                  <p className="text-[11px] leading-5 text-[#52627B] sm:text-[12px]">
+                    {aiInsight.insight}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <span className="rounded-[6px] bg-[#D9FBE8] px-2.5 py-1.5 text-[9px] font-semibold text-[#07883E]">
+                      <Check size={11} className="mr-1 inline" />
+                      {aiInsight.alignmentLabel}
+                    </span>
+
+                    <span className="rounded-[6px] bg-[#FFF0C2] px-2.5 py-1.5 text-[9px] font-semibold text-[#A85A00]">
+                      <Target size={11} className="mr-1 inline" />
+                      {aiInsight.improvementLabel}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 border-t border-[#E7DEFC] pt-2.5">
+                    <p className="text-[10px] font-semibold text-[#7C3AED]">
+                      Profile completeness: {aiInsight.completionScore}%
+                    </p>
+
+                    <p className="mt-1 text-[10px] leading-4 text-[#52627B]">
+                      {aiInsight.completionTip}
+                    </p>
+                  </div>
+                </>
+              ) : null}
             </section>
 
             {/* Profile Visibility */}
@@ -1300,7 +1543,7 @@ export default function StudentProfilePage() {
 
               <p className="text-[11px] leading-5 text-[#71839E] sm:text-[12px]">
                 Your profile can be used for job matching and application
-                analysis by the ResumeAI system.
+                analysis by the TalentIQ system.
               </p>
             </section>
           </aside>

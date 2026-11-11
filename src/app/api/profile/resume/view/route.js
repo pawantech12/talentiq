@@ -22,6 +22,13 @@ export async function GET(request) {
       );
     }
 
+    if (!resume.publicId.startsWith(`resumeai/users/${user._id}/resumes/`)) {
+      return NextResponse.json(
+        { message: "Invalid resume ownership" },
+        { status: 403 },
+      );
+    }
+
     // Generate a signed Cloudinary URL.
     const signedUrl = cloudinary.url(resume.publicId, {
       resource_type: "raw",

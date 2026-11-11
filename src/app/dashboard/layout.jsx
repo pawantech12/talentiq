@@ -18,8 +18,9 @@ export default function DashboardLayout({ children }) {
   const role = isRecruiter ? "recruiter" : "student";
 
   const isAssessmentPage =
-    pathname?.startsWith("/dashboard/student/jobs/") &&
-    pathname?.endsWith("/assessment");
+    pathname?.match(
+      /^\/dashboard\/student\/jobs\/[^/]+\/assessment(?:\/result)?\/?$/,
+    ) !== null;
   const isInterviewPage = pathname?.includes("/interview/session");
   const isSpecialPage = isAssessmentPage || isInterviewPage;
 
