@@ -197,6 +197,8 @@ export default function MyJobsPage() {
     return "bg-[#eef2ff] text-[#4f46e5]";
   };
 
+  console.log("Jobs: ", paginatedJobs);
+
   const StatCard = ({
     icon,
     title,
@@ -448,7 +450,6 @@ export default function MyJobsPage() {
             <div>Industry</div>
             <div>Location</div>
             <div>Applications</div>
-            <div>AI Match</div>
             <div>Status</div>
             <div>Created</div>
             <div>Actions</div>
@@ -469,7 +470,6 @@ export default function MyJobsPage() {
               {paginatedJobs.length > 0 ? (
                 paginatedJobs.map((job) => {
                   const matchClass = getMatchClass(job.aiMatch);
-
                   return (
                     <article
                       key={job._id}
@@ -534,16 +534,6 @@ export default function MyJobsPage() {
                           className="text-[#64748b]"
                         />
                         {job.applicationCount ?? 0}
-                      </div>
-
-                      {/* Desktop AI Match */}
-                      <div
-                        className={`hidden items-center gap-[6px] text-[13px] font-semibold lg:flex ${matchClass.text}`}
-                      >
-                        <span
-                          className={`h-[7px] w-[7px] rounded-full ${matchClass.dot}`}
-                        />
-                        {job.aiMatch ?? 0}%
                       </div>
 
                       {/* Desktop Status */}
@@ -627,37 +617,6 @@ export default function MyJobsPage() {
 
                               <p className="text-[10px] leading-[14px] text-[#64748b]">
                                 Applications
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* AI Match */}
-                          <div className="flex min-w-0 flex-1 items-center gap-[7px] border-r border-[#dce3ed] px-[12px]">
-                            <div
-                              className={`flex h-[33px] w-[33px] shrink-0 items-center justify-center rounded-[8px] ${
-                                job.aiMatch >= 84
-                                  ? "bg-[#dcfce7]"
-                                  : job.aiMatch >= 80
-                                    ? "bg-[#eef2ff]"
-                                    : "bg-[#fff3cf]"
-                              }`}
-                            >
-                              <Sparkles
-                                size={15}
-                                strokeWidth={1.7}
-                                className={matchClass.text}
-                              />
-                            </div>
-
-                            <div>
-                              <p
-                                className={`text-[14px] font-bold leading-[17px] ${matchClass.text}`}
-                              >
-                                {job.aiMatch ?? 0}%
-                              </p>
-
-                              <p className="text-[10px] leading-[14px] text-[#64748b]">
-                                AI Match
                               </p>
                             </div>
                           </div>

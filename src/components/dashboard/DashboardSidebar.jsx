@@ -15,6 +15,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import Image from "next/image";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -245,61 +246,42 @@ export default function DashboardSidebar({
             LOGO AREA
         ==================================================== */}
 
+        {/* ====================================================
+    LOGO AREA
+==================================================== */}
+
         <div
-          className={[
-            "flex",
-            "h-[64px]",
-            "shrink-0",
-            "items-center",
-            "border-b",
-            "border-[#DCE4EE]",
-            isRecruiter ? "px-[20px]" : "px-[20px]",
-          ].join(" ")}
+          className="
+    flex
+    h-[64px]
+    shrink-0
+    items-center
+    border-b
+    border-[#DCE4EE]
+    px-[20px]
+  "
         >
-          <Link href="/" className="flex items-center gap-[10px]">
-            <div
+          <Link href="/" className="flex flex-col gap-[6px]">
+            <Image
+              src="/logo.png"
+              alt="ResumeAI Logo"
+              width={128}
+              height={32}
+              priority
+              className="h-auto w-[128px] object-contain"
+            />
+
+            <p
               className="
-                flex
-                h-[32px]
-                w-[32px]
-                shrink-0
-                items-center
-                justify-center
-                rounded-[7px]
-                bg-[#5146E5]
-                text-[17px]
-                font-bold
-                text-white
-              "
+        mt-[2px]
+        text-[10px]
+        font-medium
+        leading-[12px]
+        text-[#61738E]
+      "
             >
-              R
-            </div>
-
-            <div className="min-w-0">
-              <p
-                className="
-                  text-[17px]
-                  font-bold
-                  leading-[19px]
-                  tracking-[-0.3px]
-                  text-[#111827]
-                "
-              >
-                ResumeAI
-              </p>
-
-              <p
-                className="
-                  mt-[2px]
-                  text-[10px]
-                  font-medium
-                  leading-[12px]
-                  text-[#61738E]
-                "
-              >
-                {isRecruiter ? "Recruiter Portal" : "Student Portal"}
-              </p>
-            </div>
+              {isRecruiter ? "Recruiter Portal" : "Student Portal"}
+            </p>
           </Link>
         </div>
 
@@ -495,68 +477,46 @@ export default function DashboardSidebar({
         aria-hidden={!mobileSidebarOpen}
       >
         {/* ====================================================
-            MOBILE DRAWER HEADER
-        ==================================================== */}
+    MOBILE DRAWER HEADER
+==================================================== */}
 
         <div
           className="
-            flex
-            h-[64px]
-            shrink-0
-            items-center
-            justify-between
-            border-b
-            border-[#DCE4EE]
-            px-[18px]
-          "
+    flex
+    h-[64px]
+    shrink-0
+    items-center
+    justify-between
+    border-b
+    border-[#DCE4EE]
+    px-[18px]
+  "
         >
           <Link
             href="/"
             onClick={onMobileClose}
-            className="flex items-center gap-[10px]"
+            className="flex flex-col gap-[6px]"
           >
-            <div
+            <Image
+              src="/logo.png"
+              alt="ResumeAI Logo"
+              width={128}
+              height={32}
+              priority
+              className="h-auto w-[128px] object-contain"
+            />
+
+            <p
               className="
-                flex
-                h-[32px]
-                w-[32px]
-                items-center
-                justify-center
-                rounded-[7px]
-                bg-[#5146E5]
-                text-[17px]
-                font-bold
-                text-white
-              "
+        mt-[2px]
+        text-[10px]
+        font-medium
+        leading-[12px]
+        text-[#61738E]
+      "
             >
-              R
-            </div>
-
-            <div>
-              <p
-                className="
-                  text-[17px]
-                  font-bold
-                  leading-[19px]
-                  tracking-[-0.3px]
-                  text-[#111827]
-                "
-              >
-                ResumeAI
-              </p>
-
-              <p
-                className="
-                  mt-[2px]
-                  text-[10px]
-                  font-medium
-                  leading-[12px]
-                  text-[#61738E]
-                "
-              >
-                {isRecruiter ? "Recruiter Portal" : "Student Portal"}
-              </p>
-            </div>
+              {isRecruiter ? "Recruiter Portal" : "Student Portal"}
+            </p>
           </Link>
 
           <button
@@ -564,20 +524,21 @@ export default function DashboardSidebar({
             onClick={onMobileClose}
             aria-label="Close sidebar"
             className="
-              flex
-              h-[34px]
-              w-[34px]
-              items-center
-              justify-center
-              rounded-[8px]
-              border
-              border-[#DCE4EE]
-              bg-white
-              text-[#61738E]
-              transition
-              hover:bg-[#F8FAFC]
-              hover:text-[#5146E5]
-            "
+      flex
+      h-[34px]
+      w-[34px]
+      shrink-0
+      items-center
+      justify-center
+      rounded-[8px]
+      border
+      border-[#DCE4EE]
+      bg-white
+      text-[#61738E]
+      transition
+      hover:bg-[#F8FAFC]
+      hover:text-[#5146E5]
+    "
           >
             <X size={17} strokeWidth={1.7} />
           </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BriefcaseBusiness,
@@ -14,315 +14,202 @@ import {
   UsersRound,
   UserRoundCheck,
   UserRound,
-  FileText,
-  CheckCircle2,
 } from "lucide-react";
 
-const candidates = [
-  {
-    id: "rahul-sharma",
-    name: "Rahul Sharma",
-    initials: "RS",
-    avatarClass: "bg-[#4f46e5]",
-    job: "Full Stack Dev",
-    experience: "2 Years",
-    aiMatch: 89,
-    skills: 94,
-    assessment: 84,
-    assessmentStatus: "completed",
-    shortlistedDate: "14 Aug 2026",
-    shortlistedDateValue: "2026-08-14",
-  },
-  {
-    id: "priya-patel",
-    name: "Priya Patel",
-    initials: "PP",
-    avatarClass: "bg-[#7c3aed]",
-    job: "Frontend Dev",
-    experience: "1.5 Years",
-    aiMatch: 86,
-    skills: 90,
-    assessment: null,
-    assessmentStatus: "pending",
-    shortlistedDate: "13 Aug 2026",
-    shortlistedDateValue: "2026-08-13",
-  },
-  {
-    id: "amit-verma",
-    name: "Amit Verma",
-    initials: "AV",
-    avatarClass: "bg-[#16a34a]",
-    job: "Backend Dev",
-    experience: "2 Years",
-    aiMatch: 81,
-    skills: 86,
-    assessment: 78,
-    assessmentStatus: "completed",
-    shortlistedDate: "12 Aug 2026",
-    shortlistedDateValue: "2026-08-12",
-  },
-  {
-    id: "sneha-shah",
-    name: "Sneha Shah",
-    initials: "SS",
-    avatarClass: "bg-[#f59e0b]",
-    job: "Full Stack Dev",
-    experience: "1 Year",
-    aiMatch: 76,
-    skills: 79,
-    assessment: 72,
-    assessmentStatus: "completed",
-    shortlistedDate: "11 Aug 2026",
-    shortlistedDateValue: "2026-08-11",
-  },
-  {
-    id: "vikram-joshi",
-    name: "Vikram Joshi",
-    initials: "VJ",
-    avatarClass: "bg-[#0f172a]",
-    job: "Backend Dev",
-    experience: "3 Years",
-    aiMatch: 73,
-    skills: 76,
-    assessment: 68,
-    assessmentStatus: "completed",
-    shortlistedDate: "10 Aug 2026",
-    shortlistedDateValue: "2026-08-10",
-  },
-  {
-    id: "neha-desai",
-    name: "Neha Desai",
-    initials: "ND",
-    avatarClass: "bg-[#ef4444]",
-    job: "Frontend Dev",
-    experience: "1 Year",
-    aiMatch: 64,
-    skills: 68,
-    assessment: 61,
-    assessmentStatus: "completed",
-    shortlistedDate: "09 Aug 2026",
-    shortlistedDateValue: "2026-08-09",
-  },
-  {
-    id: "rohan-mehta",
-    name: "Rohan Mehta",
-    initials: "RM",
-    avatarClass: "bg-[#0891b2]",
-    job: "Full Stack Dev",
-    experience: "2.5 Years",
-    aiMatch: 72,
-    skills: 75,
-    assessment: 70,
-    assessmentStatus: "completed",
-    shortlistedDate: "08 Aug 2026",
-    shortlistedDateValue: "2026-08-08",
-  },
-  {
-    id: "ananya-kulkarni",
-    name: "Ananya Kulkarni",
-    initials: "AK",
-    avatarClass: "bg-[#db2777]",
-    job: "Frontend Dev",
-    experience: "2 Years",
-    aiMatch: 78,
-    skills: 82,
-    assessment: null,
-    assessmentStatus: "pending",
-    shortlistedDate: "07 Aug 2026",
-    shortlistedDateValue: "2026-08-07",
-  },
-  {
-    id: "karan-shah",
-    name: "Karan Shah",
-    initials: "KS",
-    avatarClass: "bg-[#6366f1]",
-    job: "Backend Dev",
-    experience: "3 Years",
-    aiMatch: 75,
-    skills: 78,
-    assessment: 74,
-    assessmentStatus: "completed",
-    shortlistedDate: "06 Aug 2026",
-    shortlistedDateValue: "2026-08-06",
-  },
-  {
-    id: "meera-nair",
-    name: "Meera Nair",
-    initials: "MN",
-    avatarClass: "bg-[#059669]",
-    job: "Full Stack Dev",
-    experience: "2 Years",
-    aiMatch: 82,
-    skills: 88,
-    assessment: 81,
-    assessmentStatus: "completed",
-    shortlistedDate: "05 Aug 2026",
-    shortlistedDateValue: "2026-08-05",
-  },
-  {
-    id: "aditya-singh",
-    name: "Aditya Singh",
-    initials: "AS",
-    avatarClass: "bg-[#9333ea]",
-    job: "Backend Dev",
-    experience: "2 Years",
-    aiMatch: 70,
-    skills: 74,
-    assessment: 69,
-    assessmentStatus: "completed",
-    shortlistedDate: "04 Aug 2026",
-    shortlistedDateValue: "2026-08-04",
-  },
-  {
-    id: "isha-gupta",
-    name: "Isha Gupta",
-    initials: "IG",
-    avatarClass: "bg-[#ea580c]",
-    job: "Frontend Dev",
-    experience: "1.5 Years",
-    aiMatch: 68,
-    skills: 72,
-    assessment: null,
-    assessmentStatus: "pending",
-    shortlistedDate: "03 Aug 2026",
-    shortlistedDateValue: "2026-08-03",
-  },
-  {
-    id: "arjun-kapoor",
-    name: "Arjun Kapoor",
-    initials: "AK",
-    avatarClass: "bg-[#1d4ed8]",
-    job: "Full Stack Dev",
-    experience: "3 Years",
-    aiMatch: 79,
-    skills: 83,
-    assessment: 77,
-    assessmentStatus: "completed",
-    shortlistedDate: "02 Aug 2026",
-    shortlistedDateValue: "2026-08-02",
-  },
-  {
-    id: "simran-kaur",
-    name: "Simran Kaur",
-    initials: "SK",
-    avatarClass: "bg-[#be123c]",
-    job: "Frontend Dev",
-    experience: "2 Years",
-    aiMatch: 74,
-    skills: 80,
-    assessment: 73,
-    assessmentStatus: "completed",
-    shortlistedDate: "01 Aug 2026",
-    shortlistedDateValue: "2026-08-01",
-  },
-  {
-    id: "rohit-jain",
-    name: "Rohit Jain",
-    initials: "RJ",
-    avatarClass: "bg-[#334155]",
-    job: "Backend Dev",
-    experience: "3 Years",
-    aiMatch: 71,
-    skills: 77,
-    assessment: 67,
-    assessmentStatus: "completed",
-    shortlistedDate: "31 Jul 2026",
-    shortlistedDateValue: "2026-07-31",
-  },
-  {
-    id: "kavya-reddy",
-    name: "Kavya Reddy",
-    initials: "KR",
-    avatarClass: "bg-[#c026d3]",
-    job: "Full Stack Dev",
-    experience: "2 Years",
-    aiMatch: 77,
-    skills: 81,
-    assessment: 76,
-    assessmentStatus: "completed",
-    shortlistedDate: "30 Jul 2026",
-    shortlistedDateValue: "2026-07-30",
-  },
-  {
-    id: "manish-yadav",
-    name: "Manish Yadav",
-    initials: "MY",
-    avatarClass: "bg-[#15803d]",
-    job: "Backend Dev",
-    experience: "2.5 Years",
-    aiMatch: 69,
-    skills: 73,
-    assessment: 65,
-    assessmentStatus: "completed",
-    shortlistedDate: "29 Jul 2026",
-    shortlistedDateValue: "2026-07-29",
-  },
-  {
-    id: "pooja-iyer",
-    name: "Pooja Iyer",
-    initials: "PI",
-    avatarClass: "bg-[#4f46e5]",
-    job: "Frontend Dev",
-    experience: "1 Year",
-    aiMatch: 67,
-    skills: 70,
-    assessment: null,
-    assessmentStatus: "pending",
-    shortlistedDate: "28 Jul 2026",
-    shortlistedDateValue: "2026-07-28",
-  },
+const CANDIDATES_PER_PAGE = 5;
+
+const AVATAR_CLASSES = [
+  "bg-[#4f46e5]",
+  "bg-[#7c3aed]",
+  "bg-[#16a34a]",
+  "bg-[#f59e0b]",
+  "bg-[#0f172a]",
+  "bg-[#ef4444]",
+  "bg-[#0891b2]",
+  "bg-[#db2777]",
+  "bg-[#6366f1]",
+  "bg-[#059669]",
+  "bg-[#9333ea]",
+  "bg-[#ea580c]",
 ];
 
+function formatDate(date) {
+  if (!date) return "Date unavailable";
+
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getAssessmentClasses(candidate) {
+  if (candidate.assessmentStatus === "pending") {
+    return "bg-[#fff2c7] text-[#f59e0b]";
+  }
+
+  if (candidate.assessment >= 80) {
+    return "bg-[#dcfce7] text-[#16a34a]";
+  }
+
+  return "bg-[#eef2ff] text-[#4f46e5]";
+}
+
+function getAiMatchDot(score) {
+  if (score >= 85) return "bg-[#16a34a]";
+  if (score >= 75) return "bg-[#4f46e5]";
+  return "bg-[#f59e0b]";
+}
+
+function CandidateAvatar({ candidate, index, mobile = false }) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${
+        mobile ? "h-10 w-10 text-[12px]" : "h-9 w-9 text-[12px]"
+      } ${AVATAR_CLASSES[index % AVATAR_CLASSES.length]}`}
+    >
+      {candidate.initials || "C"}
+    </div>
+  );
+}
+
+function AssessmentBadge({ candidate, mobile = false }) {
+  if (candidate.assessmentStatus === "pending") {
+    return (
+      <span
+        className={`inline-flex rounded-full bg-[#fff2c7] font-medium text-[#f59e0b] ${
+          mobile
+            ? "mt-0.5 px-2 py-0.5 text-[12px] leading-4"
+            : "px-2.5 py-1 text-[11px] font-semibold"
+        }`}
+      >
+        Pending
+      </span>
+    );
+  }
+
+  if (candidate.assessment === null || candidate.assessment === undefined) {
+    return (
+      <span className="inline-flex rounded-full bg-[#dcfce7] px-2.5 py-1 text-[11px] font-semibold text-[#16a34a]">
+        Completed
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex rounded-full font-semibold ${getAssessmentClasses(
+        candidate,
+      )} ${
+        mobile
+          ? "mt-0.5 px-2 py-0.5 text-[12px] leading-4"
+          : "px-2.5 py-1 text-[11px]"
+      }`}
+    >
+      {candidate.assessment}%
+    </span>
+  );
+}
+
 export default function ShortlistedCandidatesPage() {
-  const [jobFilter, setJobFilter] = useState("All Jobs");
+  const [jobFilter, setJobFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("Shortlisted");
   const [sortBy, setSortBy] = useState("Recently Shortlisted");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const candidatesPerPage = 5;
+  const [candidates, setCandidates] = useState([]);
+  const [jobs, setJobs] = useState([]);
 
-  const filteredCandidates = useMemo(() => {
-    let result = [...candidates];
+  const [stats, setStats] = useState({
+    shortlisted: 0,
+    strongMatches: 0,
+    assessmentCompleted: 0,
+  });
 
-    if (jobFilter !== "All Jobs") {
-      result = result.filter((candidate) => candidate.job === jobFilter);
-    }
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: CANDIDATES_PER_PAGE,
+    total: 0,
+    totalPages: 0,
+  });
 
-    if (statusFilter === "Shortlisted") {
-      result = result.filter(() => true);
-    }
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-    if (sortBy === "Recently Shortlisted") {
-      result.sort(
-        (a, b) =>
-          new Date(b.shortlistedDateValue) - new Date(a.shortlistedDateValue),
-      );
-    }
+  const fetchCandidates = useCallback(
+    async (signal) => {
+      setLoading(true);
+      setError("");
 
-    if (sortBy === "Highest AI Match") {
-      result.sort((a, b) => b.aiMatch - a.aiMatch);
-    }
+      try {
+        const params = new URLSearchParams({
+          jobId: jobFilter,
+          status: statusFilter,
+          sortBy,
+          page: String(currentPage),
+          limit: String(CANDIDATES_PER_PAGE),
+        });
 
-    if (sortBy === "Highest Skills Match") {
-      result.sort((a, b) => b.skills - a.skills);
-    }
+        const response = await fetch(
+          `/api/recruiter/shortlisted?${params.toString()}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            signal,
+          },
+        );
 
-    return result;
-  }, [jobFilter, statusFilter, sortBy]);
+        const data = await response.json();
 
-  const totalPages = Math.ceil(filteredCandidates.length / candidatesPerPage);
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message || "Unable to load shortlisted candidates.",
+          );
+        }
 
-  const safePage = Math.min(currentPage, Math.max(totalPages, 1));
-
-  const startIndex = (safePage - 1) * candidatesPerPage;
-
-  const visibleCandidates = filteredCandidates.slice(
-    startIndex,
-    startIndex + candidatesPerPage,
+        setCandidates(data.candidates || []);
+        setJobs(data.jobs || []);
+        setStats(
+          data.stats || {
+            shortlisted: 0,
+            strongMatches: 0,
+            assessmentCompleted: 0,
+          },
+        );
+        setPagination(
+          data.pagination || {
+            page: 1,
+            limit: CANDIDATES_PER_PAGE,
+            total: 0,
+            totalPages: 0,
+          },
+        );
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message || "Something went wrong.");
+        }
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [jobFilter, statusFilter, sortBy, currentPage],
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchCandidates(controller.signal);
+
+    return () => controller.abort();
+  }, [fetchCandidates]);
 
   const handleJobChange = (value) => {
     setJobFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (value) => {
+    setStatusFilter(value);
     setCurrentPage(1);
   };
 
@@ -331,17 +218,28 @@ export default function ShortlistedCandidatesPage() {
     setCurrentPage(1);
   };
 
-  const getAssessmentClasses = (candidate) => {
-    if (candidate.assessmentStatus === "pending") {
-      return "bg-[#fff2c7] text-[#f59e0b]";
-    }
+  const totalPages = pagination.totalPages || 0;
+  const safePage = Math.min(currentPage, Math.max(totalPages, 1));
+  const startIndex =
+    pagination.total === 0 ? 0 : (safePage - 1) * CANDIDATES_PER_PAGE;
 
-    if (candidate.assessment >= 80) {
-      return "bg-[#dcfce7] text-[#16a34a]";
-    }
+  const showingFrom = pagination.total === 0 ? 0 : startIndex + 1;
+  const showingTo = Math.min(
+    startIndex + CANDIDATES_PER_PAGE,
+    pagination.total,
+  );
 
-    return "bg-[#eef2ff] text-[#4f46e5]";
-  };
+  const pageNumbers = useMemo(() => {
+    if (!totalPages) return [];
+
+    return Array.from({ length: totalPages }, (_, index) => index + 1).filter(
+      (page) =>
+        page === 1 || page === totalPages || Math.abs(page - safePage) <= 1,
+    );
+  }, [totalPages, safePage]);
+
+  const listCount =
+    statusFilter === "Shortlisted" ? stats.shortlisted : pagination.total;
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-[#111827]">
@@ -363,7 +261,7 @@ export default function ShortlistedCandidatesPage() {
               </h1>
 
               <span className="rounded-full bg-[#dcfce7] px-3 py-1 text-[12px] font-semibold text-[#16a34a]">
-                18 Shortlisted
+                {stats.shortlisted} Shortlisted
               </span>
             </div>
 
@@ -373,7 +271,7 @@ export default function ShortlistedCandidatesPage() {
           </div>
 
           <Link
-            href="/recruiter/candidates"
+            href="/dashboard/recruiter/candidates"
             className="hidden h-10 items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 text-[14px] font-semibold text-white transition hover:bg-[#4338ca] md:inline-flex"
           >
             <UsersRound className="h-4 w-4" />
@@ -390,7 +288,7 @@ export default function ShortlistedCandidatesPage() {
 
             <div className="min-w-0">
               <p className="text-[21px] font-bold leading-6 text-[#111827] sm:text-[24px]">
-                18
+                {stats.shortlisted}
               </p>
               <p className="mt-1 text-[12px] leading-4 text-[#64748b] sm:text-[13px]">
                 <span className="sm:hidden">Shortlisted</span>
@@ -406,7 +304,7 @@ export default function ShortlistedCandidatesPage() {
 
             <div className="min-w-0">
               <p className="text-[21px] font-bold leading-6 text-[#111827] sm:text-[24px]">
-                12
+                {stats.strongMatches}
               </p>
               <p className="mt-1 text-[12px] leading-4 text-[#64748b] sm:text-[13px]">
                 Strong Matches
@@ -421,7 +319,7 @@ export default function ShortlistedCandidatesPage() {
 
             <div className="min-w-0">
               <p className="text-[21px] font-bold leading-6 text-[#111827] sm:text-[24px]">
-                6
+                {stats.assessmentCompleted}
               </p>
               <p className="mt-1 text-[12px] leading-4 text-[#64748b]">
                 <span className="sm:hidden">Assessments</span>
@@ -441,12 +339,15 @@ export default function ShortlistedCandidatesPage() {
               <select
                 value={jobFilter}
                 onChange={(e) => handleJobChange(e.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-[#dbe3ee] bg-white pl-9 pr-9 text-[13px] font-medium text-[#475569] outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10 sm:w-[120px]"
+                aria-label="Filter by job"
+                className="h-10 w-full appearance-none rounded-lg border border-[#dbe3ee] bg-white pl-9 pr-9 text-[13px] font-medium text-[#475569] outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10 sm:w-[190px]"
               >
-                <option value="All Jobs">All Jobs</option>
-                <option value="Full Stack Dev">Full Stack Dev</option>
-                <option value="Frontend Dev">Frontend Dev</option>
-                <option value="Backend Dev">Backend Dev</option>
+                <option value="all">All Jobs</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title}
+                  </option>
+                ))}
               </select>
 
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
@@ -454,12 +355,19 @@ export default function ShortlistedCandidatesPage() {
 
             {/* Status filter */}
             <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[#16a34a]" />
+              <span
+                className={`pointer-events-none absolute left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ${
+                  statusFilter === "Shortlisted"
+                    ? "bg-[#16a34a]"
+                    : "bg-[#64748b]"
+                }`}
+              />
 
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 w-full appearance-none rounded-lg border border-[#dbe3ee] bg-white pl-7 pr-9 text-[13px] font-medium text-[#475569] outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10 sm:w-[132px]"
+                onChange={(e) => handleStatusChange(e.target.value)}
+                aria-label="Filter by candidate status"
+                className="h-10 w-full appearance-none rounded-lg border border-[#dbe3ee] bg-white pl-7 pr-9 text-[13px] font-medium text-[#475569] outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10 sm:w-[155px]"
               >
                 <option value="Shortlisted">Shortlisted</option>
                 <option value="All">All Candidates</option>
@@ -475,6 +383,7 @@ export default function ShortlistedCandidatesPage() {
               <select
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value)}
+                aria-label="Sort candidates"
                 className="h-10 w-full appearance-none rounded-lg border border-[#dbe3ee] bg-white pl-9 pr-9 text-[13px] font-medium text-[#475569] outline-none transition focus:border-[#4f46e5] focus:ring-2 focus:ring-[#4f46e5]/10 sm:w-[198px]"
               >
                 <option value="Recently Shortlisted">
@@ -496,11 +405,13 @@ export default function ShortlistedCandidatesPage() {
           {/* Section title */}
           <div className="flex items-center justify-between border-b border-[#e5eaf1] px-4 py-4 sm:px-5">
             <h2 className="text-[15px] font-bold text-[#111827] sm:text-[16px]">
-              Shortlisted Candidates
+              {statusFilter === "Shortlisted"
+                ? "Shortlisted Candidates"
+                : "All Candidates"}
             </h2>
 
             <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-[11px] font-semibold text-[#4f46e5]">
-              18 Total
+              {listCount} Total
             </span>
           </div>
 
@@ -520,271 +431,293 @@ export default function ShortlistedCandidatesPage() {
             <p className="text-[12px] font-medium text-[#64748b]">Action</p>
           </div>
 
+          {/* Loading state */}
+          {loading && (
+            <div className="space-y-3 p-5">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="h-[88px] animate-pulse rounded-xl bg-slate-100"
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Error state */}
+          {!loading && error && (
+            <div className="flex min-h-[220px] flex-col items-center justify-center px-6 text-center">
+              <h3 className="text-[15px] font-semibold text-[#111827]">
+                Could not load candidates
+              </h3>
+              <p className="mt-1 max-w-md text-[13px] text-[#64748b]">
+                {error}
+              </p>
+              <button
+                type="button"
+                onClick={() => fetchCandidates()}
+                className="mt-4 rounded-lg bg-[#4f46e5] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#4338ca]"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
           {/* Candidates */}
-          <div>
-            {visibleCandidates.map((candidate, index) => {
-              const isFirstCandidate =
-                startIndex + index === 0 && currentPage === 1;
+          {!loading && !error && (
+            <div>
+              {candidates.map((candidate, index) => {
+                const isFirstCandidate =
+                  index === 0 &&
+                  safePage === 1 &&
+                  sortBy === "Recently Shortlisted";
 
-              return (
-                <article
-                  key={candidate.id}
-                  className={`relative border-b border-[#dbe3ee] px-3.5 py-4 last:border-b-0 sm:px-5 lg:px-5 lg:py-3.5 ${
-                    isFirstCandidate ? "bg-[#eef2ff]/70" : "bg-white"
-                  }`}
-                >
-                  {/* Desktop/table layout */}
-                  <div className="hidden lg:grid lg:grid-cols-[2.1fr_1.7fr_.9fr_.8fr_.95fr_1.15fr_1.1fr_.75fr] lg:items-center lg:gap-4">
-                    {/* Candidate */}
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${candidate.avatarClass}`}
-                      >
-                        {candidate.initials}
-                      </div>
+                const candidateHref = `/dashboard/recruiter/candidates/${candidate.id}?jobId=${encodeURIComponent(
+                  candidate.jobId,
+                )}&applicationId=${encodeURIComponent(
+                  candidate.applicationId,
+                )}`;
 
-                      <div className="min-w-0">
-                        <p className="truncate text-[14px] font-semibold text-[#111827]">
-                          {candidate.name}
-                        </p>
+                const isShortlisted = candidate.status === "Shortlisted";
 
-                        <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#64748b]">
-                          <BriefcaseBusiness className="h-3 w-3" />
-                          {candidate.experience}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Applied job */}
-                    <div>
-                      <span className="inline-flex rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-medium text-[#4f46e5]">
-                        {candidate.job}
-                      </span>
-                    </div>
-
-                    {/* AI match */}
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          candidate.aiMatch >= 85
-                            ? "bg-[#16a34a]"
-                            : candidate.aiMatch >= 75
-                              ? "bg-[#4f46e5]"
-                              : "bg-[#f59e0b]"
-                        }`}
-                      />
-
-                      <span className="text-[14px] font-semibold text-[#111827]">
-                        {candidate.aiMatch}%
-                      </span>
-                    </div>
-
-                    {/* Skills */}
-                    <div className="text-[14px] font-semibold text-[#111827]">
-                      {candidate.skills}%
-                    </div>
-
-                    {/* Assessment */}
-                    <div>
-                      {candidate.assessmentStatus === "pending" ? (
-                        <span className="inline-flex rounded-full bg-[#fff2c7] px-2.5 py-1 text-[11px] font-semibold text-[#f59e0b]">
-                          Pending
-                        </span>
-                      ) : (
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getAssessmentClasses(
-                            candidate,
-                          )}`}
-                        >
-                          {candidate.assessment}%
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Shortlisted date */}
-                    <div className="flex items-center gap-1.5 whitespace-nowrap text-[12px] text-[#64748b]">
-                      <CalendarDays className="h-3.5 w-3.5" />
-                      {candidate.shortlistedDate}
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-[11px] font-semibold text-[#16a34a]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
-                        Shortlisted
-                      </span>
-                    </div>
-
-                    {/* Action */}
-                    <div>
-                      <Link
-                        href={`/recruiter/candidates/${candidate.id}`}
-                        className={`inline-flex h-8 items-center justify-center rounded-lg border px-3.5 text-[12px] font-semibold transition ${
-                          isFirstCandidate
-                            ? "border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]"
-                            : "border-[#dbe3ee] bg-white text-[#475569] hover:border-[#4f46e5] hover:text-[#4f46e5]"
-                        }`}
-                      >
-                        View
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Mobile / tablet card layout */}
-                  <div className="lg:hidden">
-                    {/* Candidate top row */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white ${candidate.avatarClass}`}
-                        >
-                          {candidate.initials}
-                        </div>
+                return (
+                  <article
+                    key={candidate.applicationId}
+                    className={`relative border-b border-[#dbe3ee] px-3.5 py-4 last:border-b-0 sm:px-5 lg:px-5 lg:py-3.5 ${
+                      isFirstCandidate ? "bg-[#eef2ff]/70" : "bg-white"
+                    }`}
+                  >
+                    {/* Desktop/table layout */}
+                    <div className="hidden lg:grid lg:grid-cols-[2.1fr_1.7fr_.9fr_.8fr_.95fr_1.15fr_1.1fr_.75fr] lg:items-center lg:gap-4">
+                      {/* Candidate */}
+                      <div className="flex min-w-0 items-center gap-3">
+                        <CandidateAvatar candidate={candidate} index={index} />
 
                         <div className="min-w-0">
-                          <p className="truncate text-[15px] font-semibold leading-5 text-[#111827]">
+                          <p className="truncate text-[14px] font-semibold text-[#111827]">
                             {candidate.name}
                           </p>
 
-                          <div className="mt-0.5 flex items-center gap-1">
-                            <span className="inline-flex rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11px] font-medium text-[#4f46e5]">
-                              {candidate.job}
-                            </span>
-                          </div>
+                          <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#64748b]">
+                            <BriefcaseBusiness className="h-3 w-3" />
+                            {candidate.experience}
+                          </p>
                         </div>
                       </div>
 
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-[11px] font-semibold text-[#16a34a]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
-                        Shortlisted
-                      </span>
-                    </div>
+                      {/* Applied job */}
+                      <div className="min-w-0">
+                        <span className="inline-flex max-w-full truncate rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-medium text-[#4f46e5]">
+                          {candidate.job}
+                        </span>
+                      </div>
 
-                    {/* Match metrics */}
-                    <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-[#dbe3ee] bg-[#f8fafc]">
-                      <div className="border-r border-[#dbe3ee] px-2.5 py-2.5">
-                        <p className="text-[11px] leading-4 text-[#64748b]">
-                          AI Match
-                        </p>
-
-                        <p className="mt-0.5 flex items-center gap-1 text-[15px] font-semibold leading-5 text-[#111827]">
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              candidate.aiMatch >= 85
-                                ? "bg-[#16a34a]"
-                                : candidate.aiMatch >= 75
-                                  ? "bg-[#4f46e5]"
-                                  : "bg-[#f59e0b]"
-                            }`}
-                          />
+                      {/* AI match */}
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`h-2 w-2 rounded-full ${getAiMatchDot(
+                            candidate.aiMatch,
+                          )}`}
+                        />
+                        <span className="text-[14px] font-semibold text-[#111827]">
                           {candidate.aiMatch}%
-                        </p>
+                        </span>
                       </div>
 
-                      <div className="border-r border-[#dbe3ee] px-2.5 py-2.5">
-                        <p className="text-[11px] leading-4 text-[#64748b]">
-                          Skills
-                        </p>
-
-                        <p className="mt-0.5 text-[15px] font-semibold leading-5 text-[#111827]">
-                          {candidate.skills}%
-                        </p>
+                      {/* Skills */}
+                      <div className="text-[14px] font-semibold text-[#111827]">
+                        {candidate.skills}%
                       </div>
 
-                      <div className="px-2.5 py-2.5">
-                        <p className="text-[11px] leading-4 text-[#64748b]">
-                          Assessment
-                        </p>
+                      {/* Assessment */}
+                      <div>
+                        <AssessmentBadge candidate={candidate} />
+                      </div>
 
-                        {candidate.assessmentStatus === "pending" ? (
-                          <span className="mt-0.5 inline-flex rounded-full bg-[#fff2c7] px-2 py-0.5 text-[12px] font-medium leading-4 text-[#f59e0b]">
-                            Pending
+                      {/* Shortlisted date */}
+                      <div className="flex items-center gap-1.5 whitespace-nowrap text-[12px] text-[#64748b]">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {isShortlisted
+                          ? formatDate(candidate.shortlistedDate)
+                          : "—"}
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        {isShortlisted ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-[11px] font-semibold text-[#16a34a]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
+                            Shortlisted
                           </span>
                         ) : (
-                          <span
-                            className={`mt-0.5 inline-flex rounded-full px-2 py-0.5 text-[12px] font-medium leading-4 ${getAssessmentClasses(
-                              candidate,
-                            )}`}
-                          >
-                            {candidate.assessment}%
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[11px] font-semibold text-[#64748b]">
+                            {candidate.status}
                           </span>
                         )}
                       </div>
+
+                      {/* Action */}
+                      <div>
+                        <Link
+                          href={candidateHref}
+                          className={`inline-flex h-8 items-center justify-center rounded-lg border px-3.5 text-[12px] font-semibold transition ${
+                            isFirstCandidate
+                              ? "border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+                              : "border-[#dbe3ee] bg-white text-[#475569] hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                          }`}
+                        >
+                          View
+                        </Link>
+                      </div>
                     </div>
 
-                    {/* Bottom row */}
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-1.5 text-[12px] text-[#64748b]">
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {candidate.shortlistedDate}
+                    {/* Mobile / tablet card layout */}
+                    <div className="lg:hidden">
+                      {/* Candidate top row */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <CandidateAvatar
+                            candidate={candidate}
+                            index={index}
+                            mobile
+                          />
+
+                          <div className="min-w-0">
+                            <p className="truncate text-[15px] font-semibold leading-5 text-[#111827]">
+                              {candidate.name}
+                            </p>
+
+                            <div className="mt-0.5 flex items-center gap-1">
+                              <span className="inline-flex max-w-[180px] truncate rounded-full bg-[#eef2ff] px-2 py-0.5 text-[11px] font-medium text-[#4f46e5]">
+                                {candidate.job}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {isShortlisted ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#dcfce7] px-2.5 py-1 text-[11px] font-semibold text-[#16a34a]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" />
+                            Shortlisted
+                          </span>
+                        ) : (
+                          <span className="inline-flex shrink-0 rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[11px] font-semibold text-[#64748b]">
+                            {candidate.status}
+                          </span>
+                        )}
                       </div>
 
-                      <Link
-                        href={`/recruiter/candidates/${candidate.id}`}
-                        className={`inline-flex h-8 min-w-[72px] items-center justify-center rounded-lg border px-4 text-[13px] font-semibold transition ${
-                          isFirstCandidate
-                            ? "border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]"
-                            : "border-[#dbe3ee] bg-white text-[#475569] hover:border-[#4f46e5] hover:text-[#4f46e5]"
-                        }`}
-                      >
-                        View
-                      </Link>
+                      {/* Match metrics */}
+                      <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-[#dbe3ee] bg-[#f8fafc]">
+                        <div className="border-r border-[#dbe3ee] px-2.5 py-2.5">
+                          <p className="text-[11px] leading-4 text-[#64748b]">
+                            AI Match
+                          </p>
+
+                          <p className="mt-0.5 flex items-center gap-1 text-[15px] font-semibold leading-5 text-[#111827]">
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${getAiMatchDot(
+                                candidate.aiMatch,
+                              )}`}
+                            />
+                            {candidate.aiMatch}%
+                          </p>
+                        </div>
+
+                        <div className="border-r border-[#dbe3ee] px-2.5 py-2.5">
+                          <p className="text-[11px] leading-4 text-[#64748b]">
+                            Skills
+                          </p>
+                          <p className="mt-0.5 text-[15px] font-semibold leading-5 text-[#111827]">
+                            {candidate.skills}%
+                          </p>
+                        </div>
+
+                        <div className="px-2.5 py-2.5">
+                          <p className="text-[11px] leading-4 text-[#64748b]">
+                            Assessment
+                          </p>
+                          <AssessmentBadge candidate={candidate} mobile />
+                        </div>
+                      </div>
+
+                      {/* Bottom row */}
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-[#64748b]">
+                          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">
+                            {isShortlisted
+                              ? formatDate(candidate.shortlistedDate)
+                              : "Not shortlisted"}
+                          </span>
+                        </div>
+
+                        <Link
+                          href={candidateHref}
+                          className={`inline-flex h-8 min-w-[72px] items-center justify-center rounded-lg border px-4 text-[13px] font-semibold transition ${
+                            isFirstCandidate
+                              ? "border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+                              : "border-[#dbe3ee] bg-white text-[#475569] hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                          }`}
+                        >
+                          View
+                        </Link>
+                      </div>
                     </div>
+                  </article>
+                );
+              })}
+
+              {candidates.length === 0 && (
+                <div className="flex min-h-[220px] flex-col items-center justify-center px-6 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff]">
+                    <UserRound className="h-5 w-5 text-[#4f46e5]" />
                   </div>
-                </article>
-              );
-            })}
 
-            {visibleCandidates.length === 0 && (
-              <div className="flex min-h-[220px] flex-col items-center justify-center px-6 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#eef2ff]">
-                  <UserRound className="h-5 w-5 text-[#4f46e5]" />
+                  <h3 className="mt-3 text-[15px] font-semibold text-[#111827]">
+                    {statusFilter === "Shortlisted"
+                      ? "No shortlisted candidates found"
+                      : "No candidates found"}
+                  </h3>
+
+                  <p className="mt-1 max-w-sm text-[13px] text-[#64748b]">
+                    Try changing the job or status filters.
+                  </p>
                 </div>
-
-                <h3 className="mt-3 text-[15px] font-semibold text-[#111827]">
-                  No shortlisted candidates found
-                </h3>
-
-                <p className="mt-1 max-w-sm text-[13px] text-[#64748b]">
-                  Try changing the job or sorting filters.
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Pagination */}
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-center text-[12px] text-[#64748b] sm:text-left sm:text-[13px]">
-            Showing{" "}
-            <span className="font-medium text-[#475569]">
-              {filteredCandidates.length === 0 ? 0 : startIndex + 1}–
-              {Math.min(
-                startIndex + candidatesPerPage,
-                filteredCandidates.length,
-              )}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium text-[#475569]">
-              {filteredCandidates.length}
-            </span>{" "}
-            shortlisted candidates
-          </p>
+        {!loading && !error && (
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-center text-[12px] text-[#64748b] sm:text-left sm:text-[13px]">
+              Showing{" "}
+              <span className="font-medium text-[#475569]">
+                {showingFrom}–{showingTo}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium text-[#475569]">
+                {pagination.total}
+              </span>{" "}
+              {statusFilter === "Shortlisted"
+                ? "shortlisted candidates"
+                : "candidates"}
+            </p>
 
-          <div className="flex items-center justify-center gap-1.5">
-            <button
-              type="button"
-              disabled={safePage === 1}
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#dbe3ee] bg-white px-3 text-[12px] font-medium text-[#475569] transition hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Previous</span>
-              <span className="sm:hidden">Prev</span>
-            </button>
+            <div className="flex items-center justify-center gap-1.5">
+              <button
+                type="button"
+                disabled={safePage === 1 || totalPages === 0}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#dbe3ee] bg-white px-3 text-[12px] font-medium text-[#475569] transition hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Previous</span>
+                <span className="sm:hidden">Prev</span>
+              </button>
 
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-              (page) => (
+              {pageNumbers.map((page) => (
                 <button
                   key={page}
                   type="button"
@@ -797,22 +730,22 @@ export default function ShortlistedCandidatesPage() {
                 >
                   {page}
                 </button>
-              ),
-            )}
+              ))}
 
-            <button
-              type="button"
-              disabled={safePage === totalPages || totalPages === 0}
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#dbe3ee] bg-white px-3 text-[12px] font-medium text-[#475569] transition hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span>Next</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+              <button
+                type="button"
+                disabled={safePage === totalPages || totalPages === 0}
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages, page + 1))
+                }
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-[#dbe3ee] bg-white px-3 text-[12px] font-medium text-[#475569] transition hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </main>
   );
