@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowRight,
   BriefcaseBusiness,
   CalendarDays,
   Check,
@@ -16,10 +15,7 @@ import {
   Rocket,
   Sparkles,
   Target,
-  Timer,
   TrendingUp,
-  UserRound,
-  X,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 

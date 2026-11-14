@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 
 import { getAuthenticatedUser } from "@/lib/profile-auth";
 
-import User from "@/app/models/User";
 import Job from "@/app/models/Job";
 import Application from "@/app/models/Application";
 import Assessment from "@/app/models/Assessment";

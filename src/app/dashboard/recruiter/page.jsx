@@ -220,14 +220,12 @@ export default function RecruiterDashboardPage() {
   };
 
   const handleViewApplications = (job) => {
-    router.push(
-      `/dashboard/recruiter/applications?jobId=${encodeURIComponent(job.id)}`,
-    );
+    router.push(`/dashboard/recruiter/jobs/${job.id}/applicants`);
   };
 
   const handleRankings = () => {
     if (jobs.length > 0) {
-      router.push(`/dashboard/recruiter/ai-screening/${jobs[0].id}/ranking`);
+      router.push(`/dashboard/recruiter/ai-screening/`);
       return;
     }
 

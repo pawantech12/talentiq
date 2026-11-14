@@ -17,7 +17,6 @@ import {
   MapPin,
   BarChart3,
   FileText,
-  X,
   AlertCircle,
 } from "lucide-react";
 

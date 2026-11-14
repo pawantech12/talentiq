@@ -1,6 +1,5 @@
 "use client";
 
-import { FileCheck2, Twitter, Linkedin, Github } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { LogOut } from "lucide-react";
 import {
+  LogOut,
   ArrowRightFromLine,
   Bell,
   Building2,
@@ -39,13 +39,11 @@ export default function DashboardHeader({
           name: "Recruiter",
           initials: "R",
           role: "Recruiter",
-          email: "",
         }
       : {
           name: "Student",
           initials: "S",
           role: "Student",
-          email: "",
         };
 
   const currentUser = {
@@ -67,7 +65,6 @@ export default function DashboardHeader({
         .map((part) => part.charAt(0).toUpperCase())
         .join("") ||
       defaultUser.initials,
-    email: user?.email || "",
   };
 
   const isRecruiter = role === "recruiter";

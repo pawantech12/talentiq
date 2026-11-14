@@ -169,7 +169,6 @@ export default function DashboardSidebar({
         : authenticatedUser?.role === "student"
           ? "Student"
           : defaultUser.role,
-    email: authenticatedUser?.email || "",
   };
 
   /*
@@ -439,16 +438,20 @@ export default function DashboardSidebar({
       ====================================================== */}
 
       {mobileSidebarOpen && (
-        <div
+        <button
+          type="button"
           className="
             fixed
             inset-0
             z-[60]
+            cursor-default
+            border-0
             bg-[#111827]/30
+            p-0
             md:hidden
           "
           onClick={onMobileClose}
-          aria-hidden="true"
+          aria-label="Close navigation menu"
         />
       )}
 
@@ -474,6 +477,9 @@ export default function DashboardSidebar({
           "md:hidden",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
+        role="dialog"
+        aria-modal={mobileSidebarOpen ? "true" : undefined}
+        aria-label="Dashboard navigation"
         aria-hidden={!mobileSidebarOpen}
       >
         {/* ====================================================

@@ -11,7 +11,6 @@ export async function getAuthenticatedUser() {
     const token = cookieStore.get("resumeai_session")?.value;
 
     if (!token) {
-      console.log("Profile auth: session cookie not found");
       return null;
     }
 
@@ -31,7 +30,6 @@ export async function getAuthenticatedUser() {
     const userId = payload.sub || payload.userId;
 
     if (!userId) {
-      console.log("Profile auth: JWT does not contain a user ID");
       return null;
     }
 
@@ -40,19 +38,16 @@ export async function getAuthenticatedUser() {
     const user = await User.findById(userId);
 
     if (!user) {
-      console.log("Profile auth: user not found in database");
       return null;
     }
 
     // Only explicitly unverified or disabled accounts are rejected.
     // This also supports older records created before these fields existed.
     if (user.emailVerified === false) {
-      console.log("Profile auth: email not verified");
       return null;
     }
 
     if (user.accountStatus === "disabled") {
-      console.log("Profile auth: account disabled");
       return null;
     }
 

@@ -221,7 +221,6 @@ export default function ApplicationsPage() {
     setSearchQuery("");
     setStatusFilter("All");
   };
-  console.log("filtered Applications: ", filteredApplications);
 
   return (
     <main className="min-h-screen bg-[#f8fafc] text-slate-900">

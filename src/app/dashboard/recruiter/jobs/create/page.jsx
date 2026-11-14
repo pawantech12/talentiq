@@ -10,7 +10,6 @@ import {
   Info,
   Plus,
   Save,
-  Send,
   Sparkles,
   Tag,
   X,

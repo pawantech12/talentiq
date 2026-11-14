@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Clock3,
-  FileCheck2,
   Mail,
   ShieldCheck,
 } from "lucide-react";

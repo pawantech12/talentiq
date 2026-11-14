@@ -3,7 +3,6 @@
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   Code2,
   Flag,
   List,

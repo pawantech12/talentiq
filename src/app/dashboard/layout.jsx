@@ -17,10 +17,12 @@ export default function DashboardLayout({ children }) {
   const isRecruiter = pathname?.startsWith("/dashboard/recruiter");
   const role = isRecruiter ? "recruiter" : "student";
 
-  const isAssessmentPage =
-    pathname?.match(
-      /^\/dashboard\/student\/jobs\/[^/]+\/assessment(?:\/result)?\/?$/,
-    ) !== null;
+  const isAssessmentPage = Boolean(
+    pathname &&
+      /^\/dashboard\/student\/jobs\/[^/]+\/assessment(?:\/result)?\/?$/.test(
+        pathname,
+      ),
+  );
   const isInterviewPage = pathname?.includes("/interview/session");
   const isSpecialPage = isAssessmentPage || isInterviewPage;
 
@@ -57,7 +59,8 @@ export default function DashboardLayout({ children }) {
     };
   }, [mobileSidebarOpen]);
 
-  // Fetch the currently authenticated user.
+  // Load the authenticated user once per dashboard mount instead of
+  // repeating the same request on every route change.
   useEffect(() => {
     let cancelled = false;
 
@@ -84,41 +87,26 @@ export default function DashboardLayout({ children }) {
           throw new Error("Invalid user response.");
         }
 
-        if (!cancelled) {
-          const fullName = data.user.fullName || "User";
+        if (cancelled) return;
 
-          const initials = fullName
-            .trim()
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((part) => part.charAt(0).toUpperCase())
-            .join("");
+        const fullName = data.user.fullName || "User";
+        const initials = fullName
+          .trim()
+          .split(/\\s+/)
+          .slice(0, 2)
+          .map((part) => part.charAt(0).toUpperCase())
+          .join("");
 
-          setUser({
-            id: data.user.id,
-            name: fullName,
-            fullName,
-            email: data.user.email,
-            role: data.user.role === "recruiter" ? "Recruiter" : "Student",
-            roleValue: data.user.role,
-            initials: initials || "U",
-            profile: data.user.profile || {},
-          });
-
-          // Prevent a student account from using recruiter dashboard
-          // and vice versa.
-          const actualDashboard =
-            data.user.role === "recruiter"
-              ? "/dashboard/recruiter"
-              : "/dashboard/student";
-
-          if (
-            pathname?.startsWith("/dashboard/") &&
-            !pathname.startsWith(actualDashboard)
-          ) {
-            router.replace(actualDashboard);
-          }
-        }
+        setUser({
+          id: data.user.id,
+          name: fullName,
+          fullName,
+          email: data.user.email,
+          role: data.user.role === "recruiter" ? "Recruiter" : "Student",
+          roleValue: data.user.role,
+          initials: initials || "U",
+          profile: data.user.profile || {},
+        });
       } catch (error) {
         console.error("Current user error:", error);
 
@@ -137,7 +125,21 @@ export default function DashboardLayout({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [router, pathname]);
+  }, [router]);
+
+  // Keep role-based route protection in sync with client-side navigation.
+  useEffect(() => {
+    if (!user || !pathname?.startsWith("/dashboard/")) return;
+
+    const actualDashboard =
+      user.roleValue === "recruiter"
+        ? "/dashboard/recruiter"
+        : "/dashboard/student";
+
+    if (!pathname.startsWith(actualDashboard)) {
+      router.replace(actualDashboard);
+    }
+  }, [pathname, router, user]);
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -203,8 +205,8 @@ export default function DashboardLayout({ children }) {
             "min-w-0 flex-1",
             !isSpecialPage
               ? role === "recruiter"
-                ? "md:ml-[247px]"
-                : "md:ml-[225px]"
+                ? "pb-[76px] md:ml-[247px] md:pb-0"
+                : "pb-[76px] md:ml-[225px] md:pb-0"
               : "",
           ].join(" ")}
         >

@@ -1,7 +1,6 @@
 "use client";
 
-import { Workflow } from "lucide-react";
-import { GitBranch, ArrowRight, Sparkles } from "lucide-react";
+import { Workflow, Sparkles } from "lucide-react";
 
 const steps = [
   {

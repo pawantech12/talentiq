@@ -22,18 +22,15 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStudentProfile } from "./useStudentProfile.js";
 import ProfileProjectForms from "./ProfileProjectForms.jsx";
 import api from "@/lib/api.js";
-import { ExternalLink } from "lucide-react";
-import { Github } from "lucide-react";
-import { ImageIcon } from "lucide-react";
-import { Link2 } from "lucide-react";
-import { RefreshCw } from "lucide-react";
+import { ExternalLink, Github, Link2, RefreshCw } from "lucide-react";
 
 export default function StudentProfilePage() {
   const resumeInputRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   const {
     profile,
@@ -83,12 +80,17 @@ export default function StudentProfilePage() {
   const notify = (message) => {
     setShowToast(message);
 
-    window.clearTimeout(window.__resumeAiToastTimer);
+    window.clearTimeout(toastTimerRef.current);
 
-    window.__resumeAiToastTimer = window.setTimeout(() => {
+    toastTimerRef.current = window.setTimeout(() => {
       setShowToast("");
+      toastTimerRef.current = null;
     }, 2200);
   };
+
+  useEffect(() => {
+    return () => window.clearTimeout(toastTimerRef.current);
+  }, []);
 
   const [draftProfile, setDraftProfile] = useState({});
   const [newSkill, setNewSkill] = useState("");

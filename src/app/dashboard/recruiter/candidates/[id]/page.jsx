@@ -273,8 +273,6 @@ export default function CandidateDetailsPage() {
       ? null
       : formatPercent(assessment.score);
 
-  console.log("candidate:", candidate);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f8fafc] px-4 py-10 text-[#172033]">

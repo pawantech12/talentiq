@@ -6,19 +6,14 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ClipboardList,
-  Eye,
-  FileText,
   Plus,
   Search,
   Users,
   CheckCircle2,
   Archive,
-  Pencil,
   MapPin,
-  Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -34,6 +29,7 @@ export default function MyJobsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const toastTimerRef = useRef(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
@@ -87,12 +83,17 @@ export default function MyJobsPage() {
   const showToast = (message) => {
     setToast(message);
 
-    window.clearTimeout(window.__resumeAiToastTimer);
+    window.clearTimeout(toastTimerRef.current);
 
-    window.__resumeAiToastTimer = window.setTimeout(() => {
+    toastTimerRef.current = window.setTimeout(() => {
       setToast("");
+      toastTimerRef.current = null;
     }, 2200);
   };
+
+  useEffect(() => {
+    return () => window.clearTimeout(toastTimerRef.current);
+  }, []);
 
   const filteredJobs = useMemo(() => {
     let result = [...jobs];
@@ -196,8 +197,6 @@ export default function MyJobsPage() {
 
     return "bg-[#eef2ff] text-[#4f46e5]";
   };
-
-  console.log("Jobs: ", paginatedJobs);
 
   const StatCard = ({
     icon,

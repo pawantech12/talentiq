@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
-  Check,
   CheckCircle2,
   FileText,
   Info,

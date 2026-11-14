@@ -7,7 +7,6 @@ import { getAuthenticatedUser } from "@/lib/profile-auth";
 import Job from "@/app/models/Job";
 import Application from "@/app/models/Application";
 import Assessment from "@/app/models/Assessment";
-import User from "@/app/models/User";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

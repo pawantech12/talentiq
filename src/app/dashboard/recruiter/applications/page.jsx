@@ -24,7 +24,6 @@ import {
   Loader2,
   Filter,
   AlertCircle,
-  GraduationCap,
 } from "lucide-react";
 
 const STATUS_OPTIONS = ["Submitted", "Under Review", "Shortlisted", "Rejected"];

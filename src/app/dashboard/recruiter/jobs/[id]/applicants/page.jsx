@@ -19,7 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import axios from "axios";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 const api = axios.create({ withCredentials: true });
@@ -70,12 +70,20 @@ export default function ApplicantsPage() {
   const [error, setError] = useState("");
   const [updatingId, setUpdatingId] = useState("");
   const [toast, setToast] = useState("");
+  const toastTimerRef = useRef(null);
 
   const showToast = (message) => {
     setToast(message);
-    window.clearTimeout(window.__applicantsToast);
-    window.__applicantsToast = window.setTimeout(() => setToast(""), 2500);
+    window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast("");
+      toastTimerRef.current = null;
+    }, 2500);
   };
+
+  useEffect(() => {
+    return () => window.clearTimeout(toastTimerRef.current);
+  }, []);
 
   const loadApplicants = useCallback(
     async (quiet = false) => {

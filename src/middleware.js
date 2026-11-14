@@ -21,7 +21,8 @@ export async function middleware(request) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
     if (
-      pathname.startsWith("/dashboard/recruiter/") &&
+      (pathname === "/dashboard/recruiter" ||
+        pathname.startsWith("/dashboard/recruiter/")) &&
       payload.role !== "recruiter"
     ) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));

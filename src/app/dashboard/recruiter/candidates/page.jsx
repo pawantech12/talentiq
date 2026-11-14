@@ -23,8 +23,6 @@ import {
   Mail,
   Phone,
   Loader2,
-  CheckCircle2,
-  Filter,
   Sparkles,
 } from "lucide-react";
 

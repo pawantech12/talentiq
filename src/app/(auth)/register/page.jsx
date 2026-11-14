@@ -16,7 +16,6 @@ import {
   ClipboardCheck,
   Eye,
   EyeOff,
-  FileCheck2,
   FileText,
   GraduationCap,
   LockKeyhole,
